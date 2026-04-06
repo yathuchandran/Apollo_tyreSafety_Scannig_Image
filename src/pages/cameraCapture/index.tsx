@@ -33,8 +33,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   useEffect(() => {
     const startCamera = async () => {
       try {
-        if (screen?.orientation && screen?.orientation?.lock) {
-          screen?.orientation?.lock('landscape').catch(() => {});
+        // ✅ FIX: Type-safe orientation lock
+        const orientation = (screen.orientation as any);
+
+        if (orientation?.lock) {
+          orientation.lock('landscape').catch(() => {});
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -62,9 +65,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     startCamera();
 
     return () => {
+      // stop camera
       streamRef.current?.getTracks().forEach(track => track.stop());
-      if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
+
+      // unlock orientation safely
+      const orientation = (screen.orientation as any);
+      if (orientation?.unlock) {
+        orientation.unlock();
       }
     };
   }, [onClose]);
@@ -138,23 +145,32 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
         <div className="absolute inset-0 bg-black/60" />
 
-        {/* Scan zone */}
+        {/* Tyre Scan Zone (Horizontal Oval Style) */}
         <div className="absolute left-0 right-0 top-[35%] h-[30%]">
 
+          {/* Top arc */}
           <div className="absolute top-0 w-full h-12 border-t-4 border-green-400 rounded-[100%]" />
+
+          {/* Bottom arc */}
           <div className="absolute bottom-0 w-full h-12 border-b-4 border-green-400 rounded-[100%]" />
 
+          {/* Center guide */}
           <div className="absolute top-1/2 left-10 right-10 h-[2px] bg-green-300 opacity-70" />
+
+          {/* Scan animation line */}
           <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-green-500 animate-scan" />
         </div>
 
+        {/* Dark areas */}
         <div className="absolute top-0 left-0 right-0 h-[35%] bg-black/70" />
         <div className="absolute bottom-0 left-0 right-0 h-[35%] bg-black/70" />
 
+        {/* Instruction */}
         <div className="absolute bottom-24 w-full text-center text-white text-lg animate-pulse">
           ➡️ Move Slowly (Left → Right)
         </div>
 
+        {/* Countdown */}
         {isRecording && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-white text-7xl font-bold animate-blink">
@@ -164,14 +180,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         )}
       </div>
 
-      {/* Top */}
+      {/* Close Button */}
       <div className="absolute top-4 left-4 z-20">
         <button onClick={onClose} className="p-3 bg-black/60 rounded-full">
           <X className="text-white" />
         </button>
       </div>
 
-      {/* Bottom */}
+      {/* Capture Button */}
       <div className="absolute bottom-10 w-full flex flex-col items-center z-20">
         <button
           onClick={startRecording}
