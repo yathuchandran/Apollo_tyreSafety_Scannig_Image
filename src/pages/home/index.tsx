@@ -18,6 +18,28 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [timeLeft, setTimeLeft] = useState(8);
   const [recordingComplete, setRecordingComplete] = useState(false);
 
+  // Force landscape orientation on mobile when camera is active
+  React.useEffect(() => {
+    const lockOrientation = async () => {
+      // Check if screen orientation API is available (mobile)
+      if (screen.orientation && 'lock' in screen.orientation) {
+        try {
+          await (screen.orientation as any).lock('landscape');
+        } catch (err) {
+          console.warn('Orientation lock not supported or denied:', err);
+        }
+      }
+    };
+    lockOrientation();
+
+    return () => {
+      // Unlock orientation when component unmounts
+      if (screen.orientation && 'unlock' in screen.orientation) {
+        (screen.orientation as any).unlock();
+      }
+    };
+  }, []);
+
   React.useEffect(() => {
     const startCamera = async () => {
       try {
