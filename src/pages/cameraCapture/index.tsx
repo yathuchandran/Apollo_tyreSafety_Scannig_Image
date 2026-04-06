@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, RotateCcw } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface CameraCaptureProps {
   onCapture: (videoUrl: string) => void;
@@ -26,26 +26,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
 
     window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Camera init
   useEffect(() => {
     const startCamera = async () => {
       try {
-        // ✅ FIX: Safe orientation lock (no TS error)
-        const orientation = screen.orientation as any;
+        // ✅ FIX: Type-safe orientation lock
+        const orientation = (screen.orientation as any);
+
         if (orientation?.lock) {
-          try {
-            await orientation.lock('landscape');
-          } catch {
-            console.log('Orientation lock not supported');
-          }
+          orientation.lock('landscape').catch(() => {});
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -65,7 +57,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           };
         }
       } catch (err) {
-        alert('Camera access denied. Please enable camera permissions.');
+        alert('Camera access denied');
         onClose();
       }
     };
@@ -73,25 +65,24 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     startCamera();
 
     return () => {
-      // Stop camera
+      // stop camera
       streamRef.current?.getTracks().forEach(track => track.stop());
 
-      // ✅ FIX: Safe unlock
-      const orientation = screen.orientation as any;
-      orientation?.unlock?.();
+      // unlock orientation safely
+      const orientation = (screen.orientation as any);
+      if (orientation?.unlock) {
+        orientation.unlock();
+      }
     };
   }, [onClose]);
 
   // Recording logic
   const startRecording = () => {
-    if (!streamRef.current || isRecording || !isLandscape) return;
+    if (!streamRef.current) return;
 
     if (navigator.vibrate) navigator.vibrate(200);
 
-    const mediaRecorder = new MediaRecorder(streamRef.current, {
-      mimeType: 'video/webm;codecs=vp8'
-    });
-
+    const mediaRecorder = new MediaRecorder(streamRef.current);
     mediaRecorderRef.current = mediaRecorder;
     chunksRef.current = [];
 
@@ -100,12 +91,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
 
     mediaRecorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
       const videoUrl = URL.createObjectURL(blob);
-
-      setTimeout(() => {
-        onCapture(videoUrl);
-      }, 300);
+      onCapture(videoUrl);
     };
 
     mediaRecorder.start();
@@ -125,24 +113,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }, 1000);
   };
 
-  // 🚫 Strict landscape only
+  // 🚫 Block portrait mode
   if (!isLandscape) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white z-50">
-        <div className="text-center px-8">
-          <div className="mb-8 relative">
-            <div className="inline-block border-4 border-blue-400 rounded-2xl p-4 animate-rotate">
-              📱
-            </div>
-            <RotateCcw className="absolute -right-2 -top-2 w-12 h-12 text-blue-400 animate-spin-slow" />
-          </div>
-
-          <h2 className="text-3xl font-bold mb-4">Rotate Your Device</h2>
-          <p className="text-gray-300 text-lg mb-2">
-            Please use <span className="text-blue-400 font-semibold">landscape mode</span>
-          </p>
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-pulse">📱↻</div>
+          <h2 className="text-xl font-semibold mb-2">Rotate Your Device</h2>
           <p className="text-gray-400 text-sm">
-            Tire scanning requires horizontal orientation
+            Please use landscape mode for tyre scanning
           </p>
         </div>
       </div>
@@ -150,7 +129,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-50 overflow-hidden">
+    <div className="fixed inset-0 bg-black z-50">
 
       {/* Video */}
       <video
@@ -158,57 +137,66 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 w-full h-full object-cover"
+        className="w-full h-full object-cover"
       />
 
       {/* Overlay */}
       <div className="absolute inset-0 pointer-events-none">
+
         <div className="absolute inset-0 bg-black/60" />
 
-        {/* Scan Frame */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[700px] h-[50%] max-h-[350px]">
-          <svg viewBox="0 0 700 350" className="w-full h-full">
-            <ellipse
-              cx="350"
-              cy="175"
-              rx="320"
-              ry="155"
-              fill="none"
-              stroke="#22c55e"
-              strokeWidth="3"
-              strokeDasharray="15 8"
-            />
-          </svg>
+        {/* Tyre Scan Zone (Horizontal Oval Style) */}
+        <div className="absolute left-0 right-0 top-[35%] h-[30%]">
+
+          {/* Top arc */}
+          <div className="absolute top-0 w-full h-12 border-t-4 border-green-400 rounded-[100%]" />
+
+          {/* Bottom arc */}
+          <div className="absolute bottom-0 w-full h-12 border-b-4 border-green-400 rounded-[100%]" />
+
+          {/* Center guide */}
+          <div className="absolute top-1/2 left-10 right-10 h-[2px] bg-green-300 opacity-70" />
+
+          {/* Scan animation line */}
+          <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-green-500 animate-scan" />
+        </div>
+
+        {/* Dark areas */}
+        <div className="absolute top-0 left-0 right-0 h-[35%] bg-black/70" />
+        <div className="absolute bottom-0 left-0 right-0 h-[35%] bg-black/70" />
+
+        {/* Instruction */}
+        <div className="absolute bottom-24 w-full text-center text-white text-lg animate-pulse">
+          ➡️ Move Slowly (Left → Right)
         </div>
 
         {/* Countdown */}
         {isRecording && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-white text-7xl font-bold animate-pulse">
+            <div className="text-white text-7xl font-bold animate-blink">
               {timeLeft}
             </div>
           </div>
         )}
       </div>
 
-      {/* Close */}
-      <div className="absolute top-6 left-6 z-20">
-        <button
-          onClick={onClose}
-          disabled={isRecording}
-          className="p-4 bg-black/80 rounded-full"
-        >
-          <X className="text-white w-6 h-6" />
+      {/* Close Button */}
+      <div className="absolute top-4 left-4 z-20">
+        <button onClick={onClose} className="p-3 bg-black/60 rounded-full">
+          <X className="text-white" />
         </button>
       </div>
 
-      {/* Capture */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20">
+      {/* Capture Button */}
+      <div className="absolute bottom-10 w-full flex flex-col items-center z-20">
         <button
           onClick={startRecording}
           disabled={!isCameraReady || isRecording}
-          className="w-24 h-24 bg-red-600 rounded-full border-4 border-white"
+          className="w-20 h-20 bg-red-500 rounded-full border-4 border-white shadow-xl"
         />
+        <p className="text-white mt-4 text-sm text-center px-6">
+          Align tyre and move slowly
+        </p>
       </div>
     </div>
   );
