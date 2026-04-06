@@ -33,8 +33,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   useEffect(() => {
     const startCamera = async () => {
       try {
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('landscape').catch(() => {});
+        if (screen?.orientation && screen?.orientation?.lock) {
+          screen?.orientation?.lock('landscape').catch(() => {});
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
