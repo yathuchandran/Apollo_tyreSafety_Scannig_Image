@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Video, CheckCircle } from 'lucide-react';
+import { Video, CheckCircle } from 'lucide-react';
 
 // CameraCapture Component
 interface CameraCaptureProps {
