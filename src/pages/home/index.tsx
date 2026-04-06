@@ -8,8 +8,6 @@ const Home: React.FC = () => {
     const handleCapturedVideo = (videoUrl: string) => {
         console.log("Captured Video:", videoUrl);
         setShowCamera(false);
-
-        // TODO: preview / upload
     };
 
     return (
