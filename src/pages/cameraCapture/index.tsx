@@ -33,9 +33,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   useEffect(() => {
     const startCamera = async () => {
       try {
-        // Safe orientation lock (optional)
+        // ✅ FIX: Type-safe orientation lock
         const orientation = (screen.orientation as any);
-        orientation?.lock?.('landscape').catch(() => {});
+
+        if (orientation?.lock) {
+          orientation.lock('landscape').catch(() => {});
+        }
 
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -62,10 +65,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     startCamera();
 
     return () => {
+      // stop camera
       streamRef.current?.getTracks().forEach(track => track.stop());
 
+      // unlock orientation safely
       const orientation = (screen.orientation as any);
-      orientation?.unlock?.();
+      if (orientation?.unlock) {
+        orientation.unlock();
+      }
     };
   }, [onClose]);
 
@@ -84,8 +91,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
 
     mediaRecorder.onstop = () => {
-      // ✅ FIX: correct format
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
       const videoUrl = URL.createObjectURL(blob);
       onCapture(videoUrl);
     };
@@ -107,6 +113,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }, 1000);
   };
 
+  // 🚫 Block portrait mode
+  if (!isLandscape) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white z-50">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-pulse">📱↻</div>
+          <h2 className="text-xl font-semibold mb-2">Rotate Your Device</h2>
+          <p className="text-gray-400 text-sm">
+            Please use landscape mode for tyre scanning
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black z-50">
 
@@ -116,37 +137,27 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         autoPlay
         playsInline
         muted
-        className={`w-full h-full object-cover transition-transform duration-300 ${
-          !isLandscape ? 'rotate-90 scale-[1.8]' : ''
-        }`}
+        className="w-full h-full object-cover"
       />
 
       {/* Overlay */}
       <div className="absolute inset-0 pointer-events-none">
 
-        {/* Dim background */}
         <div className="absolute inset-0 bg-black/60" />
 
-        {/* ⚠️ Landscape suggestion (not blocking) */}
-        {!isLandscape && (
-          <div className="absolute top-10 w-full text-center text-yellow-400 z-50 animate-pulse">
-            ⚠️ Rotate to landscape for best results
-          </div>
-        )}
-
-        {/* Tyre Scan Zone */}
+        {/* Tyre Scan Zone (Horizontal Oval Style) */}
         <div className="absolute left-0 right-0 top-[35%] h-[30%]">
 
-          {/* Top curve */}
+          {/* Top arc */}
           <div className="absolute top-0 w-full h-12 border-t-4 border-green-400 rounded-[100%]" />
 
-          {/* Bottom curve */}
+          {/* Bottom arc */}
           <div className="absolute bottom-0 w-full h-12 border-b-4 border-green-400 rounded-[100%]" />
 
-          {/* Guide line */}
+          {/* Center guide */}
           <div className="absolute top-1/2 left-10 right-10 h-[2px] bg-green-300 opacity-70" />
 
-          {/* Scan animation */}
+          {/* Scan animation line */}
           <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-green-500 animate-scan" />
         </div>
 
