@@ -15,12 +15,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [timeLeft, setTimeLeft] = useState(8);
-  const [recordingComplete, setRecordingComplete] = useState(false);
   const [isLandscape, setIsLandscape] = useState(
     window.innerWidth > window.innerHeight
   );
 
-  // Monitor orientation changes
+  // Orientation listener
   useEffect(() => {
     const handleResize = () => {
       setIsLandscape(window.innerWidth > window.innerHeight);
@@ -35,7 +34,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
   }, []);
 
-  // Camera initialization
+  // Camera init
   useEffect(() => {
     const startCamera = async () => {
       try {
@@ -104,11 +103,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
       const videoUrl = URL.createObjectURL(blob);
 
-      setRecordingComplete(true);
-
       setTimeout(() => {
         onCapture(videoUrl);
-      }, 500);
+      }, 300);
     };
 
     mediaRecorder.start();
@@ -128,7 +125,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }, 1000);
   };
 
-  // 🚫 STRICT LANDSCAPE ONLY
+  // 🚫 Strict landscape only
   if (!isLandscape) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white z-50">
@@ -166,7 +163,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
       {/* Overlay */}
       <div className="absolute inset-0 pointer-events-none">
-
         <div className="absolute inset-0 bg-black/60" />
 
         {/* Scan Frame */}
