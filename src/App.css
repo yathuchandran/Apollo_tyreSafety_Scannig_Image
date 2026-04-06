@@ -1,1 +1,20 @@
 
+@keyframes blink {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}
+
+@keyframes scan {
+  0% { transform: translateY(-15px); }
+  50% { transform: translateY(15px); }
+  100% { transform: translateY(-15px); }
+}
+
+.animate-scan {
+  animation: scan 2s infinite;
+}

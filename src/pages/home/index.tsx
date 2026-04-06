@@ -9,22 +9,18 @@ const Home: React.FC = () => {
         console.log("Captured Video:", videoUrl);
         setShowCamera(false);
 
-        // TODO:
-        // - Show preview modal
-        // - Upload to backend
+        // TODO: preview / upload
     };
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 p-4 md:p-8">
             <div className="max-w-md mx-auto">
 
-                {/* Header */}
                 <div className="text-center mb-10 pt-8">
                     <h1 className="text-3xl font-bold text-gray-800">Apollo</h1>
                     <p className="text-gray-600">Tyre Tread Analysis System</p>
                 </div>
 
-                {/* Capture Button */}
                 <button
                     onClick={() => setShowCamera(true)}
                     className="w-full bg-white rounded-2xl shadow-lg hover:shadow-xl p-8 border-2 border-blue-100 hover:border-blue-300 transition-all"
@@ -42,7 +38,6 @@ const Home: React.FC = () => {
                     </div>
                 </button>
 
-                {/* Camera */}
                 {showCamera && (
                     <CameraCapture
                         onCapture={handleCapturedVideo}

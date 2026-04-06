@@ -53,6 +53,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const startRecording = () => {
     if (!streamRef.current) return;
 
+    if (navigator.vibrate) {
+      navigator.vibrate(200);
+    }
+
     const mediaRecorder = new MediaRecorder(streamRef.current);
     mediaRecorderRef.current = mediaRecorder;
     chunksRef.current = [];
@@ -99,28 +103,45 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         className="w-full h-full object-cover"
       />
 
-      {/* Overlay */}
+      {/* 🔥 Tyre Style Overlay */}
       <div className="absolute inset-0 pointer-events-none">
 
-        {/* Dark layer */}
-        <div className="absolute inset-0 bg-black/50" />
+        {/* Dark background */}
+        <div className="absolute inset-0 bg-black/60" />
 
-        {/* Tyre Guide Box */}
-        <div className="absolute top-16 bottom-24 left-[20%] right-[20%] border-2 border-green-400" />
+        {/* Horizontal scan area */}
+        <div className="absolute left-0 right-0 top-[35%] h-[30%]">
 
-        {/* Edge Lines */}
-        <div className="absolute top-16 bottom-24 left-[20%] w-[3px] bg-green-400" />
-        <div className="absolute top-16 bottom-24 right-[20%] w-[3px] bg-green-400" />
+          {/* Top curve */}
+          <div className="absolute top-0 w-full h-12 border-t-4 border-green-400 rounded-[100%]" />
 
-        {/* Direction */}
-        <div className="absolute bottom-32 left-0 right-0 text-center text-white text-lg animate-pulse">
+          {/* Bottom curve */}
+          <div className="absolute bottom-0 w-full h-12 border-b-4 border-green-400 rounded-[100%]" />
+
+          {/* Middle guide line */}
+          <div className="absolute top-1/2 left-10 right-10 h-[2px] bg-green-300 opacity-70" />
+
+          {/* Moving scan line */}
+          <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-green-500 animate-scan" />
+        </div>
+
+        {/* Mask top */}
+        <div className="absolute top-0 left-0 right-0 h-[35%] bg-black/70" />
+
+        {/* Mask bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-[35%] bg-black/70" />
+
+        {/* Instruction */}
+        <div className="absolute bottom-24 w-full text-center text-white text-lg animate-pulse">
           ➡️ Move Slowly (Left → Right)
         </div>
 
-        {/* Timer */}
+        {/* 🔥 Center Blinking Timer */}
         {isRecording && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-black/70 px-5 py-2 rounded-full text-white text-xl font-bold">
-            {timeLeft}s
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-white text-7xl font-bold animate-blink">
+              {timeLeft}
+            </div>
           </div>
         )}
       </div>
@@ -135,7 +156,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         </button>
       </div>
 
-      {/* Bottom Controls */}
+      {/* Bottom Button */}
       <div className="absolute bottom-10 w-full flex flex-col items-center z-20">
 
         <button
@@ -145,7 +166,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         />
 
         <p className="text-white mt-4 text-sm text-center px-6">
-          Align tyre within lines and move slowly from left to right
+          Align tyre within guide and move slowly
         </p>
       </div>
     </div>
