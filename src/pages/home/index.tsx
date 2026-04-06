@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Video, CheckCircle, RotateCcw, X } from 'lucide-react';
+import { Video, CheckCircle } from 'lucide-react';
 
-// ============= CAMERA CAPTURE COMPONENT =============
+// CameraCapture Component
 interface CameraCaptureProps {
   onCapture: (videoUrl: string) => void;
   onClose: () => void;
@@ -17,37 +17,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [isRecording, setIsRecording] = useState(false);
   const [timeLeft, setTimeLeft] = useState(8);
   const [recordingComplete, setRecordingComplete] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(
-    window.innerWidth > window.innerHeight
-  );
 
-  // Monitor orientation
-  React.useEffect(() => {
-    const handleResize = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, []);
-
-  // Camera init
   React.useEffect(() => {
     const startCamera = async () => {
       try {
-        if (screen.orientation && screen.orientation.lock) {
-          try {
-            await screen.orientation.lock('landscape');
-          } catch (err) {
-            console.log('Orientation lock not supported');
-          }
-        }
-
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'environment',
@@ -73,15 +46,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
     return () => {
       streamRef.current?.getTracks().forEach(track => track.stop());
-      if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
-      }
     };
   }, [onClose]);
 
-  // Recording
   const startRecording = () => {
-    if (!streamRef.current || isRecording || !isLandscape) return;
+    if (!streamRef.current || isRecording) return;
 
     if (navigator.vibrate) navigator.vibrate(200);
 
@@ -122,136 +91,105 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }, 1000);
   };
 
-  // MANDATORY LANDSCAPE
-  if (!isLandscape) {
-    return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white z-50">
-        <div className="text-center px-8">
-          <div className="mb-8 relative">
-            <div className="inline-block border-4 border-blue-400 rounded-2xl p-4 animate-rotate">
-              📱
-            </div>
-            <RotateCcw className="absolute -right-2 -top-2 w-12 h-12 text-blue-400 animate-spin-slow" />
-          </div>
-          
-          <h2 className="text-3xl font-bold mb-4">Rotate Your Device</h2>
-          <p className="text-gray-300 text-lg mb-2">
-            Please use <span className="text-blue-400 font-semibold">landscape mode</span>
-          </p>
-          <p className="text-gray-400 text-sm">
-            Tire scanning requires horizontal orientation
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 bg-black z-50 overflow-hidden">
       <div className="relative w-full h-full">
-        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-cover"
+        />
       </div>
 
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/50" />
 
-        {/* Landscape Tire Frame */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[700px] h-[50%] max-h-[350px]">
-          
-          <div className="absolute inset-0 rounded-[50%] bg-transparent" 
-               style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.7)' }} />
+        {/* Tire-shaped guide */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] max-w-[600px] aspect-[3/1.2]">
+          <svg viewBox="0 0 600 240" className="w-full h-full" style={{ filter: 'drop-shadow(0 0 20px rgba(34, 197, 94, 0.5))' }}>
+            <ellipse cx="300" cy="120" rx="280" ry="100" fill="none" stroke="#22c55e" strokeWidth="4" strokeDasharray="10 5" className="animate-dash" />
+            <ellipse cx="300" cy="120" rx="240" ry="80" fill="none" stroke="#22c55e" strokeWidth="2" opacity="0.5" />
+            
+            <line x1="200" y1="40" x2="200" y2="200" stroke="#22c55e" strokeWidth="1.5" opacity="0.4" />
+            <line x1="250" y1="30" x2="250" y2="210" stroke="#22c55e" strokeWidth="1.5" opacity="0.4" />
+            <line x1="300" y1="20" x2="300" y2="220" stroke="#22c55e" strokeWidth="2" opacity="0.6" />
+            <line x1="350" y1="30" x2="350" y2="210" stroke="#22c55e" strokeWidth="1.5" opacity="0.4" />
+            <line x1="400" y1="40" x2="400" y2="200" stroke="#22c55e" strokeWidth="1.5" opacity="0.4" />
 
-          <svg viewBox="0 0 700 350" className="w-full h-full absolute inset-0" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="frameGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 0.8 }} />
-                <stop offset="50%" style={{ stopColor: '#22c55e', stopOpacity: 1 }} />
-                <stop offset="100%" style={{ stopColor: '#10b981', stopOpacity: 0.8 }} />
-              </linearGradient>
-            </defs>
-
-            <ellipse cx="350" cy="175" rx="320" ry="155" fill="none" stroke="url(#frameGradient)" 
-                     strokeWidth="3" strokeDasharray="15 8" className="animate-dash" />
-            <ellipse cx="350" cy="175" rx="280" ry="125" fill="none" stroke="#22c55e" 
-                     strokeWidth="1.5" opacity="0.4" />
-
-            {/* Tread lines */}
-            <line x1="150" y1="40" x2="150" y2="310" stroke="#22c55e" strokeWidth="2" opacity="0.5" />
-            <line x1="220" y1="25" x2="220" y2="325" stroke="#22c55e" strokeWidth="2" opacity="0.5" />
-            <line x1="290" y1="18" x2="290" y2="332" stroke="#22c55e" strokeWidth="2.5" opacity="0.6" />
-            <line x1="350" y1="15" x2="350" y2="335" stroke="#22c55e" strokeWidth="3" opacity="0.7" />
-            <line x1="410" y1="18" x2="410" y2="332" stroke="#22c55e" strokeWidth="2.5" opacity="0.6" />
-            <line x1="480" y1="25" x2="480" y2="325" stroke="#22c55e" strokeWidth="2" opacity="0.5" />
-            <line x1="550" y1="40" x2="550" y2="310" stroke="#22c55e" strokeWidth="2" opacity="0.5" />
-
-            <circle cx="350" cy="175" r="6" fill="#22c55e">
+            <circle cx="300" cy="120" r="8" fill="#22c55e" opacity="0.8">
               <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" />
             </circle>
 
-            <line x1="100" y1="175" x2="600" y2="175" stroke="#10b981" strokeWidth="1" opacity="0.3" strokeDasharray="5 5" />
-
             {isRecording && (
-              <line x1="50" y1="175" x2="650" y2="175" stroke="#10b981" strokeWidth="3" opacity="0.8">
-                <animate attributeName="x1" values="50;650;50" dur="2s" repeatCount="indefinite" />
-                <animate attributeName="x2" values="80;680;80" dur="2s" repeatCount="indefinite" />
+              <line x1="50" y1="120" x2="550" y2="120" stroke="#10b981" strokeWidth="3" opacity="0.9">
+                <animate attributeName="x1" values="50;550;50" dur="2s" repeatCount="indefinite" />
+                <animate attributeName="x2" values="70;570;70" dur="2s" repeatCount="indefinite" />
               </line>
             )}
           </svg>
 
-          <div className="absolute inset-0 rounded-[50%]" style={{ boxShadow: 'inset 0 0 40px rgba(16, 185, 129, 0.3)' }} />
+          <div className="absolute -top-4 -left-4 w-12 h-12 border-t-4 border-l-4 border-green-400 rounded-tl-lg" />
+          <div className="absolute -top-4 -right-4 w-12 h-12 border-t-4 border-r-4 border-green-400 rounded-tr-lg" />
+          <div className="absolute -bottom-4 -left-4 w-12 h-12 border-b-4 border-l-4 border-green-400 rounded-bl-lg" />
+          <div className="absolute -bottom-4 -right-4 w-12 h-12 border-b-4 border-r-4 border-green-400 rounded-br-lg" />
         </div>
 
         {!isRecording && isCameraReady && (
           <>
-            <div className="absolute top-6 left-0 right-0 text-center">
-              <div className="inline-flex items-center gap-3 bg-black/80 px-8 py-4 rounded-full backdrop-blur-md border border-green-500/30">
-                <span className="text-3xl">🎯</span>
-                <p className="text-white text-lg font-medium">Position tire within the frame</p>
+            <div className="absolute top-8 left-0 right-0 text-center">
+              <div className="inline-block bg-black/70 px-6 py-3 rounded-full backdrop-blur-sm">
+                <p className="text-white text-base font-medium flex items-center gap-2 justify-center">
+                  <span className="text-2xl">🔍</span>
+                  <span>Align tire within the guide</span>
+                </p>
               </div>
             </div>
             
-            <div className="absolute bottom-28 left-0 right-0 text-center">
-              <div className="inline-flex items-center gap-4 bg-gradient-to-r from-blue-600/90 to-green-600/90 px-10 py-5 rounded-full backdrop-blur-md border-2 border-white/30 shadow-2xl animate-pulse-slow">
-                <span className="text-3xl">➡️</span>
-                <p className="text-white text-xl font-bold tracking-wide">Move camera slowly left to right</p>
-                <span className="text-3xl">➡️</span>
+            <div className="absolute bottom-32 left-0 right-0 text-center">
+              <div className="inline-block bg-black/70 px-8 py-4 rounded-full backdrop-blur-sm animate-pulse-slow">
+                <p className="text-green-400 text-lg font-semibold flex items-center gap-3 justify-center">
+                  <span className="text-2xl">➡️</span>
+                  <span>Move camera slowly left to right</span>
+                  <span className="text-2xl">➡️</span>
+                </p>
               </div>
             </div>
           </>
         )}
 
         {isRecording && (
-          <>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative">
-                <div className="text-white font-black animate-countdown-pulse" 
-                     style={{ fontSize: '140px', textShadow: '0 0 40px rgba(16, 185, 129, 0.9)', WebkitTextStroke: '3px rgba(16, 185, 129, 0.5)' }}>
-                  {timeLeft}
-                </div>
-                
-                <svg className="absolute -inset-12 w-64 h-64" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-                  <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
-                  <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round"
-                    strokeDasharray="283" strokeDashoffset={283 - (283 * (8 - timeLeft)) / 8}
-                    style={{ transition: 'stroke-dashoffset 1s linear' }} />
-                </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative">
+              <div className="text-white font-bold animate-countdown-pulse" style={{ fontSize: '120px', textShadow: '0 0 30px rgba(34, 197, 94, 0.8)' }}>
+                {timeLeft}
               </div>
+              
+              <svg className="absolute -inset-8 w-48 h-48 -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
+                <circle cx="50" cy="50" r="45" fill="none" stroke="#22c55e" strokeWidth="4" strokeLinecap="round"
+                  strokeDasharray="283" strokeDashoffset={283 - (283 * (8 - timeLeft)) / 8}
+                  style={{ transition: 'stroke-dashoffset 1s linear' }} />
+              </svg>
             </div>
+          </div>
+        )}
 
-            <div className="absolute top-8 left-1/2 -translate-x-1/2">
-              <div className="flex items-center gap-3 bg-red-600 px-8 py-4 rounded-full shadow-2xl border-2 border-white/50">
-                <div className="w-4 h-4 bg-white rounded-full animate-pulse" />
-                <span className="text-white font-bold text-base uppercase tracking-widest">Recording</span>
-              </div>
+        {isRecording && (
+          <div className="absolute top-8 left-1/2 -translate-x-1/2">
+            <div className="flex items-center gap-3 bg-red-500 px-6 py-3 rounded-full shadow-lg">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+              <span className="text-white font-semibold text-sm uppercase tracking-wide">Recording</span>
             </div>
-          </>
+          </div>
         )}
 
         {recordingComplete && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-            <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-12 py-6 rounded-3xl shadow-2xl animate-scale-in border-4 border-white/30">
-              <p className="text-white text-3xl font-black flex items-center gap-4">
-                <span className="text-5xl">✓</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <div className="bg-green-500 px-8 py-4 rounded-2xl shadow-2xl animate-scale-in">
+              <p className="text-white text-2xl font-bold flex items-center gap-3">
+                <span className="text-3xl">✓</span>
                 <span>Scan Complete!</span>
               </p>
             </div>
@@ -259,34 +197,36 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         )}
       </div>
 
-      <div className="absolute top-6 left-6 z-20 pointer-events-auto">
+      <div className="absolute top-4 left-4 z-20 pointer-events-auto">
         <button onClick={onClose} disabled={isRecording}
-          className="p-4 bg-black/80 hover:bg-black rounded-full backdrop-blur-md transition-all disabled:opacity-50 border border-white/20">
-          <X className="text-white w-7 h-7" />
+          className="p-3 bg-black/70 hover:bg-black/90 rounded-full backdrop-blur-sm transition-all disabled:opacity-50">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
 
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
         <button onClick={startRecording} disabled={!isCameraReady || isRecording || recordingComplete}
           className="relative group disabled:opacity-50 disabled:cursor-not-allowed">
-          <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" style={{ animationDuration: '2s' }} />
+          <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75 group-hover:opacity-100" 
+               style={{ animationDuration: '2s' }} />
           
-          <div className="relative w-24 h-24 bg-red-600 rounded-full border-4 border-white shadow-2xl 
-                          flex items-center justify-center transition-all duration-200 
-                          group-hover:scale-110 group-active:scale-95 group-hover:border-8">
-            {!isRecording && <div className="w-8 h-8 bg-white rounded-sm" />}
+          <div className="relative w-20 h-20 bg-red-500 rounded-full border-4 border-white shadow-2xl 
+                          flex items-center justify-center transition-transform group-hover:scale-110 group-active:scale-95">
+            {!isRecording && <div className="w-6 h-6 bg-white rounded-sm" />}
           </div>
         </button>
         
         {!isRecording && isCameraReady && (
-          <p className="text-white text-base text-center mt-4 font-semibold tracking-wide">Tap to start scanning</p>
+          <p className="text-white text-sm text-center mt-3 font-medium">Tap to start scanning</p>
         )}
       </div>
     </div>
   );
 };
 
-// ============= HOME COMPONENT =============
+// Home Component
 const Home: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [capturedVideos, setCapturedVideos] = useState<string[]>([]);
@@ -300,29 +240,40 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
+        {/* Header */}
         <div className="text-center mb-12 pt-8">
           <div className="inline-block">
-            <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">Apollo</h1>
+            <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">
+              Apollo
+            </h1>
             <div className="h-1 bg-gradient-to-r from-blue-400 to-green-400 rounded-full"></div>
           </div>
           <p className="text-blue-200 mt-4 text-lg">Tyre Tread Analysis System</p>
         </div>
 
-        <button onClick={() => setShowCamera(true)}
+        {/* Main Capture Button */}
+        <button
+          onClick={() => setShowCamera(true)}
           className="w-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl shadow-2xl hover:shadow-blue-500/50 
                      p-10 border border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 
-                     transform hover:scale-[1.02] active:scale-[0.98] group">
+                     transform hover:scale-[1.02] active:scale-[0.98] group"
+        >
           <div className="flex flex-col items-center gap-6">
             <div className="relative">
               <div className="absolute inset-0 bg-white/20 rounded-full blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
+              <div className="relative w-20 h-20 bg-white rounded-full flex items-center justify-center 
+                              shadow-lg group-hover:shadow-white/50 transition-all">
                 <Video className="w-10 h-10 text-blue-600" />
               </div>
             </div>
             
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Start Tyre Scan</h2>
-              <p className="text-blue-100 text-sm">Capture 8-second video of tyre tread</p>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Start Tyre Scan
+              </h2>
+              <p className="text-blue-100 text-sm">
+                Capture 8-second video of tyre tread
+              </p>
             </div>
 
             <div className="flex items-center gap-4 text-blue-100 text-sm">
@@ -333,7 +284,7 @@ const Home: React.FC = () => {
               <div className="w-1 h-1 bg-blue-300 rounded-full"></div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4" />
-                <span>Landscape</span>
+                <span>Auto-guided</span>
               </div>
               <div className="w-1 h-1 bg-blue-300 rounded-full"></div>
               <div className="flex items-center gap-2">
@@ -344,13 +295,18 @@ const Home: React.FC = () => {
           </div>
         </button>
 
+        {/* Captured Videos */}
         {capturedVideos.length > 0 && (
           <div className="mt-8">
             <h3 className="text-white text-xl font-semibold mb-4">Recent Scans</h3>
             <div className="grid gap-4">
               {capturedVideos.map((videoUrl, index) => (
                 <div key={index} className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                  <video src={videoUrl} controls className="w-full rounded-lg" />
+                  <video 
+                    src={videoUrl} 
+                    controls 
+                    className="w-full rounded-lg"
+                  />
                   <p className="text-white/70 text-sm mt-2">Scan {capturedVideos.length - index}</p>
                 </div>
               ))}
@@ -358,20 +314,21 @@ const Home: React.FC = () => {
           </div>
         )}
 
+        {/* Instructions */}
         <div className="mt-12 bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
           <h3 className="text-white text-lg font-semibold mb-4">📋 How to Scan</h3>
           <ol className="space-y-3 text-blue-100">
             <li className="flex gap-3">
               <span className="font-bold text-blue-400">1.</span>
-              <span>Rotate device to landscape mode</span>
+              <span>Position tire horizontally in the camera view</span>
             </li>
             <li className="flex gap-3">
               <span className="font-bold text-blue-400">2.</span>
-              <span>Position tire horizontally within the green frame</span>
+              <span>Align tire within the green guide frame</span>
             </li>
             <li className="flex gap-3">
               <span className="font-bold text-blue-400">3.</span>
-              <span>Tap record and slowly move camera left to right</span>
+              <span>Tap record and slowly move left to right</span>
             </li>
             <li className="flex gap-3">
               <span className="font-bold text-blue-400">4.</span>
@@ -381,41 +338,47 @@ const Home: React.FC = () => {
         </div>
       </div>
 
+      {/* Camera Modal */}
       {showCamera && (
-        <CameraCapture onCapture={handleCapturedVideo} onClose={() => setShowCamera(false)} />
+        <CameraCapture
+          onCapture={handleCapturedVideo}
+          onClose={() => setShowCamera(false)}
+        />
       )}
 
+      {/* CSS Animations */}
       <style>{`
         @keyframes countdown-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.15); }
+          50% { opacity: 0.4; transform: scale(1.2); }
         }
-        .animate-countdown-pulse { animation: countdown-pulse 1s ease-in-out infinite; }
+        .animate-countdown-pulse {
+          animation: countdown-pulse 1s ease-in-out infinite;
+        }
 
-        @keyframes dash { to { stroke-dashoffset: -46; } }
-        .animate-dash { animation: dash 3s linear infinite; }
+        @keyframes dash {
+          to { stroke-dashoffset: -30; }
+        }
+        .animate-dash {
+          animation: dash 2s linear infinite;
+        }
 
         @keyframes pulse-slow {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.85; transform: scale(1.03); }
+          50% { opacity: 0.8; transform: scale(1.02); }
         }
-        .animate-pulse-slow { animation: pulse-slow 2.5s ease-in-out infinite; }
+        .animate-pulse-slow {
+          animation: pulse-slow 2s ease-in-out infinite;
+        }
 
         @keyframes scale-in {
-          0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
-          60% { transform: scale(1.1) rotate(5deg); }
-          100% { opacity: 1; transform: scale(1) rotate(0deg); }
+          0% { opacity: 0; transform: scale(0.5); }
+          50% { transform: scale(1.1); }
+          100% { opacity: 1; transform: scale(1); }
         }
-        .animate-scale-in { animation: scale-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
-
-        @keyframes rotate {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(90deg); }
+        .animate-scale-in {
+          animation: scale-in 0.5s ease-out;
         }
-        .animate-rotate { animation: rotate 1.5s ease-in-out infinite alternate; }
-
-        @keyframes spin-slow { to { transform: rotate(360deg); } }
-        .animate-spin-slow { animation: spin-slow 3s linear infinite; }
       `}</style>
     </div>
   );
