@@ -134,7 +134,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         <div style={{
           width: '100%',
           height: 'auto',
-          aspectRatio: '4 / 3',
+          aspectRatio: '6 / 7',
           position: 'relative',
           overflow: 'hidden',
         }}>
