@@ -37,20 +37,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1080 },
+            height: { ideal: 1920 },
           },
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           streamRef.current = stream;
-          videoRef.current.onloadedmetadata = () => {
-            setIsCameraReady(true);
-            // Force a resize to ensure proper aspect ratio
-            if (videoRef.current) {
-              videoRef.current.play();
-            }
-          };
+          videoRef.current.onloadedmetadata = () => setIsCameraReady(true);
         }
       } catch {
         alert('Camera access denied. Please enable camera permissions.');
@@ -95,32 +89,34 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, background: '#000', zIndex: 50,
-      display: 'flex', flexDirection: 'column',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: '#000',
+      zIndex: 50,
+      display: 'flex',
+      flexDirection: 'column',
       overflow: 'hidden',
+      height: '100vh',
+      width: '100vw',
     }}>
-      {/* Camera feed — fixed aspect ratio with object-fit contain to prevent zoom */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#000',
-      }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{
-            width: 'auto',
-            height: '100%',
-            maxWidth: '100%',
-            objectFit: 'cover',
-            objectPosition: 'center',
-          }}
-        />
-      </div>
+      {/* Camera feed — no rotation, pure portrait */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      />
 
       {/* Vignette */}
       <div style={{
