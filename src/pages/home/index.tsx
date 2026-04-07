@@ -119,7 +119,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       height: '100vh',
       width: '100vw',
     }}>
-      {/* Camera feed container - 4:3 aspect ratio */}
+      {/* Camera feed container - 6:7 aspect ratio */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -166,22 +166,26 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         position: 'absolute', top: 0, left: 0, right: 0, height: 100,
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.82), transparent)',
         pointerEvents: 'none',
+        zIndex: 5,
       }} />
       {/* Bottom gradient */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 120,
         background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
         pointerEvents: 'none',
+        zIndex: 5,
       }} />
 
-      {/* ══ SCAN FRAME — portrait rectangle ══ */}
+      {/* ══ SCAN FRAME — positioned relative to the 6:7 camera container ══ */}
       <div style={{
         position: 'absolute',
-        left: '50%', top: '50%',
+        left: '50%',
+        top: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '72%',
+        width: 'min(72%, calc(100% * 6 / 7 * 0.72))',
         aspectRatio: '3 / 7',
         pointerEvents: 'none',
+        zIndex: 15,
       }}>
         <svg
           viewBox="0 0 270 630"
@@ -354,7 +358,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
           }}>
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>4:3 · HD</span>
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>6:7 · HD</span>
           </div>
 
           {/* Center record button */}
