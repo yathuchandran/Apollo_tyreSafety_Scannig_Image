@@ -248,7 +248,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           />
 
           {/* ───────── SMALL TREAD MARK LINES (vertical ticks) ───────── */}
-          {[120, 200, 300, 400, 500].map((y, i) => (
+          {[120, 200, 300, 400, 500].map((y) => (
             <line
               key={y}
               x1="55"
