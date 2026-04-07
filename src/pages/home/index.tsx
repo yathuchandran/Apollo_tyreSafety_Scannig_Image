@@ -102,21 +102,31 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       height: '100vh',
       width: '100vw',
     }}>
-      {/* Camera feed — no rotation, pure portrait */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-        }}
-      />
+      {/* Camera feed container - constrained height to prevent zoom */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+      }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: 'auto',
+            height: '100%',
+            maxWidth: 'none',
+            objectFit: 'contain',
+          }}
+        />
+      </div>
 
       {/* Vignette */}
       <div style={{
@@ -227,6 +237,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: '14px 20px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        zIndex: 10,
       }}>
         <button
           onClick={onClose}
@@ -271,6 +282,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         position: 'absolute', bottom: 0, left: 0, right: 0,
         padding: '16px 28px 28px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+        zIndex: 10,
       }}>
         {/* Progress / hint */}
         {!isRecording && isCameraReady && (
@@ -376,6 +388,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'fadeIn 0.3s ease',
+          zIndex: 20,
         }}>
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
