@@ -94,8 +94,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       <div style={{
         width: '100vh',
         height: '100vw',
-        // transform: 'rotate(90deg)',
-        // transformOrigin: '50% 50%',
+        transform: 'rotate(90deg)',
+        transformOrigin: '50% 50%',
         position: 'relative',
         overflow: 'hidden',
         flexShrink: 0,
