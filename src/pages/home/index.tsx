@@ -1,9 +1,29 @@
-import React, { useState } from 'react';
-import { Video, CheckCircle, RotateCcw } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
 
-// ─────────────────────────────────────────────
-// LandscapePrompt Component
-// ─────────────────────────────────────────────
+// ─── LANDSCAPE WRAPPER ───────────────────────────────────────────────────────
+// Rotates the ENTIRE screen 90° — camera feed + HUD rotate together
+const LandscapeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, overflow: 'hidden',
+      background: '#000',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        width: '100vh',
+        height: '100vw',
+        transform: 'rotate(90deg)',
+        transformOrigin: 'center center',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// ─── LANDSCAPE PROMPT ────────────────────────────────────────────────────────
 interface LandscapePromptProps {
   onContinue: () => void;
   onClose: () => void;
@@ -11,188 +31,164 @@ interface LandscapePromptProps {
 
 const LandscapePrompt: React.FC<LandscapePromptProps> = ({ onContinue, onClose }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)' }}>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      background: '#080c10',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: "'DM Sans', sans-serif",
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 70% 50% at 50% 60%, rgba(0,210,120,0.07) 0%, transparent 70%)',
+      }} />
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.04 }}>
+        <defs><pattern id="g" width="32" height="32" patternUnits="userSpaceOnUse">
+          <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#00d47a" strokeWidth="0.5" />
+        </pattern></defs>
+        <rect width="100%" height="100%" fill="url(#g)" />
+      </svg>
 
-      {/* Animated background grid */}
-      <div className="absolute inset-0 overflow-hidden opacity-10">
-        <svg width="100%" height="100%">
-          <defs>
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#22c55e" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
+      <button onClick={onClose} style={{
+        position: 'absolute', top: 20, left: 20,
+        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 12, width: 40, height: 40, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'rgba(255,255,255,0.5)', fontSize: 18,
+      }}>✕</button>
+
+      <div style={{ position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)' }}>
+        <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, letterSpacing: '0.35em', textTransform: 'uppercase', fontWeight: 500 }}>
+          APOLLO · TREAD SCAN
+        </span>
       </div>
 
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-6 left-6 z-20 p-2 rounded-full"
-        style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}
-      >
-        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-
-      <div className="relative flex flex-col items-center gap-8 px-8 text-center">
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 40, padding: '0 32px', maxWidth: 360 }}>
 
         {/* Phone rotation animation */}
-        <div className="relative flex items-center justify-center" style={{ width: 180, height: 180 }}>
-
-          {/* Orbit ring */}
-          <div className="absolute inset-0 rounded-full"
-            style={{ border: '1px solid rgba(34,197,94,0.25)', animation: 'spin-slow 8s linear infinite' }} />
-          <div className="absolute rounded-full"
-            style={{ inset: 16, border: '1px dashed rgba(34,197,94,0.15)', animation: 'spin-slow 5s linear infinite reverse' }} />
-
-          {/* Phone SVG that rotates */}
-          <div style={{ animation: 'phone-rotate 2.8s cubic-bezier(0.4,0,0.2,1) infinite' }}>
-            <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
-              {/* Phone body */}
-              <rect x="28" y="10" width="34" height="60" rx="6" fill="rgba(34,197,94,0.15)" stroke="#22c55e" strokeWidth="2" />
-              {/* Screen */}
-              <rect x="32" y="18" width="26" height="42" rx="3" fill="rgba(34,197,94,0.1)" stroke="#22c55e" strokeWidth="1" />
-              {/* Home bar */}
-              <rect x="39" y="65" width="12" height="3" rx="1.5" fill="#22c55e" opacity="0.6" />
-              {/* Camera dot */}
-              <circle cx="45" cy="14" r="1.5" fill="#22c55e" opacity="0.5" />
+        <div style={{ position: 'relative', width: 160, height: 160 }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.15)', animation: 'spin 12s linear infinite' }} />
+          <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', border: '1px dashed rgba(0,212,122,0.1)', animation: 'spin 8s linear infinite reverse' }} />
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,122,0.12) 0%, transparent 70%)' }} />
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'phoneRotate 3s cubic-bezier(0.4,0,0.2,1) infinite',
+          }}>
+            <svg width="52" height="88" viewBox="0 0 52 88" fill="none">
+              <rect x="1" y="1" width="50" height="86" rx="9" fill="rgba(0,212,122,0.06)" stroke="rgba(0,212,122,0.6)" strokeWidth="1.5" />
+              <rect x="7" y="10" width="38" height="60" rx="4" fill="rgba(0,212,122,0.04)" stroke="rgba(0,212,122,0.25)" strokeWidth="1" />
+              <rect x="20" y="75" width="12" height="3" rx="1.5" fill="rgba(0,212,122,0.4)" />
+              <circle cx="26" cy="5.5" r="1.5" fill="rgba(0,212,122,0.3)" />
+              <line x1="7" y1="40" x2="45" y2="40" stroke="rgba(0,212,122,0.3)" strokeWidth="0.75" strokeDasharray="3 2" />
+              <line x1="7" y1="35" x2="45" y2="35" stroke="rgba(0,212,122,0.15)" strokeWidth="0.5" />
+              <line x1="7" y1="45" x2="45" y2="45" stroke="rgba(0,212,122,0.15)" strokeWidth="0.5" />
             </svg>
           </div>
-
-          {/* Rotation arrow */}
-          <div className="absolute" style={{ bottom: 10, right: 10 }}>
-            <RotateCcw size={20} color="#22c55e" style={{ animation: 'rotate-arrow 2.8s ease-in-out infinite' }} />
-          </div>
-        </div>
-
-        {/* Text */}
-        <div className="flex flex-col gap-3">
-          <h2 className="text-white font-bold" style={{ fontSize: 26, letterSpacing: '-0.5px' }}>
-            Rotate Your Phone
-          </h2>
-          <p className="text-green-400 font-medium" style={{ fontSize: 15 }}>
-            Landscape mode captures more tyre tread
-          </p>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, maxWidth: 260, margin: '0 auto', lineHeight: 1.6 }}>
-            Turn your device sideways to unlock the full scanning view and get the best analysis results
-          </p>
-        </div>
-
-        {/* Landscape preview illustration */}
-        <div className="relative"
-          style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 16, padding: '16px 24px' }}>
-          <svg width="220" height="80" viewBox="0 0 220 80" fill="none">
-            {/* Phone in landscape */}
-            <rect x="10" y="18" width="200" height="44" rx="8" fill="rgba(34,197,94,0.08)" stroke="#22c55e" strokeWidth="1.5" />
-            {/* Screen */}
-            <rect x="20" y="24" width="180" height="32" rx="4" fill="rgba(34,197,94,0.06)" stroke="#22c55e" strokeWidth="1" strokeOpacity="0.5" />
-            {/* Scanner frame inside */}
-            <rect x="40" y="29" width="140" height="22" rx="2" fill="none" stroke="#4ade80" strokeWidth="1" strokeDasharray="4 2" />
-            {/* Tyre tread lines */}
-            <line x1="60" y1="29" x2="60" y2="51" stroke="#22c55e" strokeWidth="0.75" opacity="0.4" />
-            <line x1="80" y1="29" x2="80" y2="51" stroke="#22c55e" strokeWidth="0.75" opacity="0.4" />
-            <line x1="110" y1="29" x2="110" y2="51" stroke="#22c55e" strokeWidth="1" opacity="0.7" />
-            <line x1="140" y1="29" x2="140" y2="51" stroke="#22c55e" strokeWidth="0.75" opacity="0.4" />
-            <line x1="160" y1="29" x2="160" y2="51" stroke="#22c55e" strokeWidth="0.75" opacity="0.4" />
-            {/* Side button */}
-            <rect x="8" y="30" width="3" height="10" rx="1.5" fill="#22c55e" opacity="0.4" />
-            {/* Home bar */}
-            <rect x="205" y="36" width="5" height="8" rx="2.5" fill="#22c55e" opacity="0.4" />
-            {/* Check label */}
-            <circle cx="110" cy="66" r="6" fill="rgba(34,197,94,0.2)" />
-            <path d="M107 66l2 2 4-4" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <text x="122" y="70" fontSize="10" fill="#4ade80" fontFamily="system-ui">Landscape ready</text>
+          <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 160 160">
+            <path d="M 140 80 A 60 60 0 0 0 80 20" stroke="rgba(0,212,122,0.4)" strokeWidth="2" fill="none" strokeLinecap="round" strokeDasharray="8 4" style={{ animation: 'dashMove 2s linear infinite' }} />
+            <polygon points="78,14 86,24 70,24" fill="rgba(0,212,122,0.6)" />
           </svg>
         </div>
 
-        {/* CTA Button */}
-        <button
-          onClick={onContinue}
-          className="relative group"
-          style={{
-            background: 'linear-gradient(135deg, #16a34a, #22c55e)',
-            border: 'none',
-            borderRadius: 50,
-            padding: '16px 48px',
-            color: 'white',
-            fontSize: 16,
-            fontWeight: 600,
-            letterSpacing: '0.3px',
-            cursor: 'pointer',
-            boxShadow: '0 0 40px rgba(34,197,94,0.3)',
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Video size={18} />
-            Got it — Open Camera
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ color: '#fff', fontSize: 26, fontWeight: 600, margin: '0 0 12px', letterSpacing: '-0.5px', lineHeight: 1.2 }}>
+            Rotate to Landscape
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+            Turn your phone sideways so the scanner captures the full tyre tread width in one pass.
+          </p>
+        </div>
+
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { icon: '↻', label: 'Rotate phone 90° to landscape' },
+            { icon: '◎', label: 'Align tread in the green frame' },
+            { icon: '→', label: 'Sweep slowly left to right' },
+          ].map((s, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 14,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 12, padding: '12px 16px',
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#00d47a', fontSize: 16, flexShrink: 0,
+              }}>{s.icon}</div>
+              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>{s.label}</span>
+              <div style={{
+                marginLeft: 'auto', width: 20, height: 20, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'rgba(255,255,255,0.2)', fontSize: 11,
+              }}>{i + 1}</div>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={onContinue} style={{
+          width: '100%',
+          background: 'linear-gradient(135deg, #00c46e, #00d47a)',
+          border: 'none', borderRadius: 16, padding: '18px 32px',
+          color: '#001a0d', fontSize: 15, fontWeight: 700,
+          letterSpacing: '0.3px', cursor: 'pointer',
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+            Open Scanner
           </span>
         </button>
-
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
-          Hold the phone horizontally before recording
-        </p>
       </div>
 
       <style>{`
-        @keyframes phone-rotate {
-          0%   { transform: rotate(0deg); }
-          30%  { transform: rotate(0deg); }
-          60%  { transform: rotate(-90deg); }
-          85%  { transform: rotate(-90deg); }
-          100% { transform: rotate(0deg); }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes phoneRotate {
+          0%,25%  { transform: rotate(0deg); }
+          55%,85% { transform: rotate(-90deg); }
+          100%    { transform: rotate(0deg); }
         }
-        @keyframes rotate-arrow {
-          0%, 30% { opacity: 0; transform: rotate(0deg); }
-          50%      { opacity: 1; transform: rotate(-180deg); }
-          85%      { opacity: 0; }
-          100%     { opacity: 0; }
-        }
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
+        @keyframes dashMove { to { stroke-dashoffset: -24; } }
       `}</style>
     </div>
   );
 };
 
-// ─────────────────────────────────────────────
-// CameraCapture Component — rotated 90° UI
-// ─────────────────────────────────────────────
+// ─── CAMERA CAPTURE ──────────────────────────────────────────────────────────
 interface CameraCaptureProps {
   onCapture: (videoUrl: string) => void;
   onClose: () => void;
 }
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-  const streamRef = React.useRef<MediaStream | null>(null);
-  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
-  const chunksRef = React.useRef<Blob[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [timeLeft, setTimeLeft] = useState(8);
   const [recordingComplete, setRecordingComplete] = useState(false);
+  const [scanX, setScanX] = useState(0);
 
-  React.useEffect(() => {
-    const lockOrientation = async () => {
-      if (screen.orientation && 'lock' in screen.orientation) {
-        try { await (screen.orientation as any).lock('landscape'); } catch { /* ignore */ }
-      }
-    };
-    lockOrientation();
-    return () => {
-      if (screen.orientation && 'unlock' in screen.orientation) {
-        (screen.orientation as any).unlock();
-      }
-    };
-  }, []);
+  useEffect(() => {
+    if (!isRecording) { setScanX(0); return; }
+    let x = 0; let dir = 1;
+    const id = setInterval(() => {
+      x += dir * 2.5;
+      if (x >= 100) dir = -1;
+      if (x <= 0) dir = 1;
+      setScanX(x);
+    }, 16);
+    return () => clearInterval(id);
+  }, [isRecording]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -204,7 +200,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           videoRef.current.onloadedmetadata = () => setIsCameraReady(true);
         }
       } catch {
-        alert('Camera access denied. Please enable camera permissions.');
+        alert('Camera access denied.');
         onClose();
       }
     };
@@ -213,423 +209,409 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   }, [onClose]);
 
   const startRecording = () => {
-    if (!streamRef.current || isRecording) return;
-    if (navigator.vibrate) navigator.vibrate(200);
-    const mediaRecorder = new MediaRecorder(streamRef.current, { mimeType: 'video/webm;codecs=vp8' });
-    mediaRecorderRef.current = mediaRecorder;
+    if (!streamRef.current || isRecording || !isCameraReady) return;
+    if (navigator.vibrate) navigator.vibrate(100);
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm';
+    const mr = new MediaRecorder(streamRef.current, { mimeType });
+    mediaRecorderRef.current = mr;
     chunksRef.current = [];
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-    mediaRecorder.onstop = () => {
+    mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    mr.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      const videoUrl = URL.createObjectURL(blob);
       setRecordingComplete(true);
-      setTimeout(() => onCapture(videoUrl), 600);
+      setTimeout(() => onCapture(URL.createObjectURL(blob)), 800);
     };
-    mediaRecorder.start();
+    mr.start();
     setIsRecording(true);
     setTimeLeft(8);
-    let seconds = 8;
-    const interval = setInterval(() => {
-      seconds--;
-      setTimeLeft(seconds);
-      if (seconds === 0) { clearInterval(interval); mediaRecorder.stop(); setIsRecording(false); }
+    let s = 8;
+    const iv = setInterval(() => {
+      s--; setTimeLeft(s);
+      if (s === 0) { clearInterval(iv); mr.stop(); setIsRecording(false); }
     }, 1000);
   };
 
+  const progress = ((8 - timeLeft) / 8) * 100;
+  const circumference = 2 * Math.PI * 28;
+
   return (
-    /* Outer: full screen, black background, everything inside rotated 90° */
-    <div className="fixed inset-0 bg-black z-50 overflow-hidden flex items-center justify-center">
+    <LandscapeWrapper>
+      {/* Camera feed fills the rotated container perfectly */}
+      <video
+        ref={videoRef} autoPlay playsInline muted
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+      />
 
-      {/* The entire camera UI is rotated 90° clockwise to simulate landscape on portrait devices */}
-      <div
-        style={{
-          position: 'absolute',
-          width: '100vh',       /* rotated: height becomes width */
-          height: '100vw',      /* rotated: width becomes height */
-          transform: 'rotate(90deg)',
-          transformOrigin: 'center center',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Live Camera Feed */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        />
+      {/* Vignette */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 120% 80% at 50% 50%, transparent 35%, rgba(0,0,0,0.6) 100%)',
+      }} />
 
-        {/* ── HUD Layer ── */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      {/* Top gradient */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80, background: 'linear-gradient(to bottom, rgba(0,0,0,0.72), transparent)', pointerEvents: 'none' }} />
+      {/* Bottom gradient */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 96, background: 'linear-gradient(to top, rgba(0,0,0,0.78), transparent)', pointerEvents: 'none' }} />
 
-          {/* Top bar gradient */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: 80,
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
-          }} />
-
-          {/* Bottom bar gradient */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
-          }} />
-
-          {/* ── Scanner frame: wide, flat rectangle ── */}
-          <div style={{
-            position: 'absolute',
-            left: '50%', top: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '86%', maxWidth: 680,
-            aspectRatio: '680 / 200',
-          }}>
-            <svg viewBox="0 0 680 200" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
-              {/* Animated dashed top/bottom */}
-              <line x1="0" y1="0" x2="680" y2="0" stroke="#22c55e" strokeWidth="2.5" strokeDasharray="12 6" className="dash-anim" />
-              <line x1="0" y1="200" x2="680" y2="200" stroke="#22c55e" strokeWidth="2.5" strokeDasharray="12 6" className="dash-anim" />
-              {/* Solid left/right */}
-              <line x1="0" y1="0" x2="0" y2="200" stroke="#22c55e" strokeWidth="2.5" />
-              <line x1="680" y1="0" x2="680" y2="200" stroke="#22c55e" strokeWidth="2.5" />
-
-              {/* Guide verticals */}
-              {[136, 272, 340, 408, 544].map((x, i) => (
-                <line key={x} x1={x} y1="0" x2={x} y2="200"
-                  stroke="#22c55e" strokeWidth={i === 2 ? 2 : 1.2} opacity={i === 2 ? 0.9 : 0.35} />
-              ))}
-
-              {/* Tick marks */}
-              {[136, 272, 340, 408, 544].map((x, i) => (
-                <g key={x}>
-                  <line x1={x} y1="0" x2={x} y2={i === 2 ? -14 : -10} stroke="#22c55e" strokeWidth={i === 2 ? 2.5 : 1.8} opacity="0.6" />
-                  <line x1={x} y1="200" x2={x} y2={i === 2 ? 214 : 210} stroke="#22c55e" strokeWidth={i === 2 ? 2.5 : 1.8} opacity="0.6" />
-                </g>
-              ))}
-
-              {/* Pulsing center dot */}
-              <circle cx="340" cy="100" r="5" fill="#22c55e" opacity="0.9">
-                <animate attributeName="opacity" values="0.25;1;0.25" dur="1.6s" repeatCount="indefinite" />
-              </circle>
-
-              {/* Scanning line while recording */}
-              {isRecording && (
-                <line x1="0" y1="0" x2="0" y2="200" stroke="#4ade80" strokeWidth="2.5" opacity="0.9">
-                  <animate attributeName="x1" values="0;680;0" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="x2" values="0;680;0" dur="2s" repeatCount="indefinite" />
-                </line>
-              )}
-
-              {/* Corner glow spots */}
-              <circle cx="0" cy="0" r="8" fill="#22c55e" opacity="0.35" />
-              <circle cx="680" cy="0" r="8" fill="#22c55e" opacity="0.35" />
-              <circle cx="0" cy="200" r="8" fill="#22c55e" opacity="0.35" />
-              <circle cx="680" cy="200" r="8" fill="#22c55e" opacity="0.35" />
-            </svg>
-
-            {/* L-brackets */}
-            {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((pos) => (
-              <div key={pos} style={{
-                position: 'absolute',
-                top: pos.includes('top') ? -2 : undefined,
-                bottom: pos.includes('bottom') ? -2 : undefined,
-                left: pos.includes('left') ? -2 : undefined,
-                right: pos.includes('right') ? -2 : undefined,
-                width: 28, height: 28,
-                borderTop: pos.includes('top') ? '3.5px solid #4ade80' : undefined,
-                borderBottom: pos.includes('bottom') ? '3.5px solid #4ade80' : undefined,
-                borderLeft: pos.includes('left') ? '3.5px solid #4ade80' : undefined,
-                borderRight: pos.includes('right') ? '3.5px solid #4ade80' : undefined,
-              }} />
-            ))}
-          </div>
-
-          {/* ── Label: align tyre (before recording) ── */}
-          {!isRecording && isCameraReady && (
-            <div style={{ position: 'absolute', top: 18, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-              <div style={{
-                background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
-                borderRadius: 50, padding: '8px 22px',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}>
-                <p style={{ color: 'white', fontSize: 13, margin: 0, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#4ade80', fontSize: 16 }}>◎</span>
-                  Align tyre tread within the guide frame
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* ── Direction hint ── */}
-          {!isRecording && isCameraReady && (
-            <div style={{ position: 'absolute', bottom: 22, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-              <div style={{
-                background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
-                borderRadius: 50, padding: '10px 28px',
-                border: '1px solid rgba(34,197,94,0.25)',
-                animation: 'pulse-hint 2.5s ease-in-out infinite',
-              }}>
-                <p style={{ color: '#4ade80', fontSize: 13, margin: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span>→</span>
-                  Move camera slowly left to right
-                  <span>→</span>
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* ── Recording badge ── */}
+      {/* ══ SCANNER FRAME ══ */}
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '82%', maxWidth: 660,
+        aspectRatio: '16 / 4.5',
+        pointerEvents: 'none',
+      }}>
+        <svg viewBox="0 0 660 186" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
+          {/* Frame fill */}
+          <rect x="0" y="0" width="660" height="186" rx="3" fill="rgba(0,212,122,0.025)" />
+          {/* Dashed border */}
+          <rect x="0.75" y="0.75" width="658.5" height="184.5" rx="3" fill="none"
+            stroke="rgba(0,212,122,0.65)" strokeWidth="1.5" strokeDasharray="10 5"
+            style={{ animation: 'dashMove 3s linear infinite' }}
+          />
+          {/* Guide verticals */}
+          {[132, 264, 330, 396, 528].map((x, i) => (
+            <line key={x} x1={x} y1="0" x2={x} y2="186"
+              stroke="#00d47a" strokeWidth={i === 2 ? 1.5 : 0.8} opacity={i === 2 ? 0.5 : 0.18} />
+          ))}
+          {/* Tick marks */}
+          {[132, 264, 330, 396, 528].map((x, i) => (
+            <g key={`t${x}`}>
+              <line x1={x} y1="0" x2={x} y2={i === 2 ? -14 : -9} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
+              <line x1={x} y1="186" x2={x} y2={i === 2 ? 200 : 195} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
+            </g>
+          ))}
+          {/* Center crosshair */}
+          <circle cx="330" cy="93" r="5" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
+            <animate attributeName="opacity" values="0.15;0.85;0.15" dur="2s" repeatCount="indefinite" />
+          </circle>
+          <line x1="320" y1="93" x2="340" y2="93" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
+          <line x1="330" y1="83" x2="330" y2="103" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
+          {/* Scanning beam */}
           {isRecording && (
-            <div style={{ position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)' }}>
-              <div style={{
-                background: '#ef4444', borderRadius: 50, padding: '8px 22px',
-                display: 'flex', alignItems: 'center', gap: 10,
-                boxShadow: '0 0 20px rgba(239,68,68,0.5)',
-              }}>
-                <div style={{
-                  width: 10, height: 10, borderRadius: '50%', background: 'white',
-                  animation: 'blink 1s ease-in-out infinite',
-                }} />
-                <span style={{ color: 'white', fontSize: 12, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase' }}>Recording</span>
-              </div>
-            </div>
+            <line x1={`${scanX * 6.6}`} y1="0" x2={`${scanX * 6.6}`} y2="186" stroke="#00d47a" strokeWidth="1.5" opacity="0.75">
+              <animate attributeName="opacity" values="0.3;0.85;0.3" dur="0.6s" repeatCount="indefinite" />
+            </line>
           )}
+        </svg>
 
-          {/* ── Countdown ── */}
-          {isRecording && (
-            <div style={{ position: 'absolute', right: 32, top: '50%', transform: 'translateY(-50%)' }}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="80" height="80" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#22c55e" strokeWidth="5"
-                    strokeLinecap="round" strokeDasharray="264"
-                    strokeDashoffset={264 - (264 * (8 - timeLeft)) / 8}
-                    style={{ transition: 'stroke-dashoffset 1s linear' }} />
-                </svg>
-                <span style={{
-                  position: 'absolute', color: 'white', fontSize: 28, fontWeight: 700,
-                  textShadow: '0 0 20px rgba(34,197,94,0.8)',
-                  animation: 'count-pulse 1s ease-in-out infinite',
-                }}>{timeLeft}</span>
-              </div>
-            </div>
-          )}
+        {/* Corner L-brackets */}
+        {[
+          { top: -2, left: -2, bt: '2.5px', bl: '2.5px' },
+          { top: -2, right: -2, bt: '2.5px', br: '2.5px' },
+          { bottom: -2, left: -2, bb: '2.5px', bl: '2.5px' },
+          { bottom: -2, right: -2, bb: '2.5px', br: '2.5px' },
+        ].map((c, i) => (
+          <div key={i} style={{
+            position: 'absolute', width: 22, height: 22,
+            top: (c as any).top, bottom: (c as any).bottom, left: (c as any).left, right: (c as any).right,
+            borderTop: (c as any).bt ? `${(c as any).bt} solid #00d47a` : undefined,
+            borderBottom: (c as any).bb ? `${(c as any).bb} solid #00d47a` : undefined,
+            borderLeft: (c as any).bl ? `${(c as any).bl} solid #00d47a` : undefined,
+            borderRight: (c as any).br ? `${(c as any).br} solid #00d47a` : undefined,
+          }} />
+        ))}
 
-          {/* ── Scan complete ── */}
-          {recordingComplete && (
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'rgba(0,0,0,0.55)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <div style={{
-                background: '#16a34a', borderRadius: 20, padding: '20px 36px',
-                display: 'flex', alignItems: 'center', gap: 14,
-                boxShadow: '0 0 60px rgba(34,197,94,0.4)',
-                animation: 'scale-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              }}>
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <circle cx="16" cy="16" r="15" fill="rgba(255,255,255,0.2)" />
-                  <path d="M9 16l5 5 9-9" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span style={{ color: 'white', fontSize: 22, fontWeight: 700 }}>Scan Complete!</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Close button ── */}
-        <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 20, pointerEvents: 'auto' }}>
-          <button
-            onClick={onClose}
-            disabled={isRecording}
-            style={{
-              background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '50%', width: 44, height: 44,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', opacity: isRecording ? 0.4 : 1,
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* ── Record button: right side (landscape layout) ── */}
+        {/* Frame label */}
         <div style={{
-          position: 'absolute', right: 28, top: '50%', transform: 'translateY(-50%)',
-          zIndex: 20, pointerEvents: 'auto',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+          position: 'absolute', top: -26, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: 6,
         }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: isRecording ? '#ef4444' : '#00d47a',
+            animation: 'blink 1s ease-in-out infinite',
+          }} />
+          <span style={{ color: '#00d47a', fontSize: 10, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+            {isRecording ? 'SCANNING' : 'ALIGN TYRE TREAD'}
+          </span>
+        </div>
+      </div>
+
+      {/* ══ TOP BAR ══ */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, padding: '14px 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        pointerEvents: 'auto',
+      }}>
+        <button onClick={onClose} disabled={isRecording} style={{
+          width: 40, height: 40, borderRadius: 12,
+          background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: isRecording ? 'rgba(255,255,255,0.25)' : 'white',
+          fontSize: 16, cursor: isRecording ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>✕</button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: isRecording ? '#ef4444' : '#00d47a',
+            boxShadow: isRecording ? '0 0 8px rgba(239,68,68,0.9)' : '0 0 8px rgba(0,212,122,0.9)',
+            animation: 'blink 1s ease-in-out infinite',
+          }} />
+          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, letterSpacing: '0.2em', fontFamily: 'monospace' }}>
+            {isRecording ? 'REC' : 'APOLLO'}
+          </span>
+        </div>
+
+        <div style={{
+          padding: '6px 14px', borderRadius: 20,
+          background: isRecording ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.07)',
+          border: `1px solid ${isRecording ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.12)'}`,
+        }}>
+          <span style={{ color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: 600, fontFamily: 'monospace' }}>
+            {isRecording ? `0:0${timeLeft}` : '0:08'}
+          </span>
+        </div>
+      </div>
+
+      {/* ══ BOTTOM BAR ══ */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 28px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        pointerEvents: 'auto',
+      }}>
+        {/* Left: hint / progress */}
+        <div style={{ minWidth: 120 }}>
+          {!isRecording && isCameraReady && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{ display: 'flex', gap: 3, animation: 'slideRight 2s ease-in-out infinite' }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{ width: 16, height: 2, borderRadius: 1, background: `rgba(0,212,122,${0.3 + i * 0.3})` }} />
+                  ))}
+                </div>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Sweep left → right</span>
+              </div>
+              <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: 10 }}>Hold steady & flat</span>
+            </div>
+          )}
+          {isRecording && (
+            <div>
+              <div style={{ width: 110, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 5 }}>
+                <div style={{
+                  height: '100%', borderRadius: 2,
+                  background: 'linear-gradient(90deg, #00c46e, #00d47a)',
+                  width: `${progress}%`, transition: 'width 1s linear',
+                }} />
+              </div>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>{8 - timeLeft}s of 8s</span>
+            </div>
+          )}
+        </div>
+
+        {/* Center: record button */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
           <button
             onClick={startRecording}
             disabled={!isCameraReady || isRecording || recordingComplete}
-            style={{ position: 'relative', cursor: 'pointer', background: 'none', border: 'none', padding: 0,
-              opacity: (!isCameraReady || isRecording || recordingComplete) ? 0.5 : 1 }}
+            style={{
+              position: 'relative', cursor: (!isCameraReady || isRecording || recordingComplete) ? 'not-allowed' : 'pointer',
+              background: 'none', border: 'none', padding: 0,
+              opacity: (!isCameraReady || isRecording || recordingComplete) ? 0.4 : 1,
+            }}
           >
-            {/* Ping ring */}
+            {isRecording && (
+              <svg style={{ position: 'absolute', inset: -6, width: 76, height: 76 }} viewBox="0 0 76 76">
+                <circle cx="38" cy="38" r="28" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                <circle cx="38" cy="38" r="28" fill="none" stroke="#ef4444" strokeWidth="3"
+                  strokeLinecap="round" strokeDasharray={circumference}
+                  strokeDashoffset={circumference - (circumference * progress) / 100}
+                  transform="rotate(-90 38 38)" style={{ transition: 'stroke-dashoffset 1s linear' }} />
+              </svg>
+            )}
             <div style={{
-              position: 'absolute', inset: 0, borderRadius: '50%', background: '#ef4444',
-              animation: 'ping 2s cubic-bezier(0,0,0.2,1) infinite', opacity: 0.6,
-            }} />
-            <div style={{
-              position: 'relative', width: 68, height: 68, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-              border: '4px solid white',
+              width: 64, height: 64, borderRadius: '50%',
+              border: `2px solid ${isRecording ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.28)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 30px rgba(239,68,68,0.5)',
+              background: isRecording ? 'rgba(239,68,68,0.07)' : 'rgba(255,255,255,0.05)',
             }}>
-              <div style={{ width: 22, height: 22, borderRadius: 4, background: 'white' }} />
+              <div style={{
+                width: 44, height: 44, borderRadius: isRecording ? 8 : '50%',
+                background: isRecording ? '#ef4444' : '#00d47a',
+                transition: 'all 0.3s ease',
+                boxShadow: isRecording ? '0 0 18px rgba(239,68,68,0.55)' : '0 0 18px rgba(0,212,122,0.5)',
+              }} />
             </div>
           </button>
-          {!isRecording && isCameraReady && (
-            <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, textAlign: 'center', fontWeight: 500, whiteSpace: 'nowrap' }}>
-              Tap to scan
-            </p>
-          )}
+          <span style={{ color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.3)', fontSize: 10, letterSpacing: '0.08em', animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none' }}>
+            {isRecording ? `● ${timeLeft}s` : 'TAP TO SCAN'}
+          </span>
         </div>
 
-        <style>{`
-          @keyframes dash-move { to { stroke-dashoffset: -36; } }
-          .dash-anim { animation: dash-move 3s linear infinite; }
-          @keyframes ping { 0%,100%{transform:scale(1);opacity:.7} 50%{transform:scale(1.5);opacity:0} }
-          @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-          @keyframes count-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.1)} }
-          @keyframes pulse-hint { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.75;transform:scale(1.015)} }
-          @keyframes scale-in { 0%{opacity:0;transform:scale(0.4)} 60%{transform:scale(1.08)} 100%{opacity:1;transform:scale(1)} }
-        `}</style>
+        {/* Right: badge */}
+        <div style={{ textAlign: 'right', minWidth: 80 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+            borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+          }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>HD · ENV</span>
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* ══ SCAN COMPLETE ══ */}
+      {recordingComplete && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.3s ease',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, animation: 'scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'rgba(0,212,122,0.12)', border: '2px solid rgba(0,212,122,0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <path d="M7 16l6 6 12-12" stroke="#00d47a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, margin: 0 }}>Processing video…</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        @keyframes dashMove { to { stroke-dashoffset: -30; } }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+        @keyframes slideRight { 0%{transform:translateX(-4px);opacity:0.4} 50%{transform:translateX(4px);opacity:1} 100%{transform:translateX(-4px);opacity:0.4} }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes scaleIn { from{transform:scale(0.5);opacity:0} 60%{transform:scale(1.06)} to{transform:scale(1);opacity:1} }
+      `}</style>
+    </LandscapeWrapper>
   );
 };
 
-// ─────────────────────────────────────────────
-// Home Component
-// ─────────────────────────────────────────────
+// ─── HOME ────────────────────────────────────────────────────────────────────
 const Home: React.FC = () => {
-  const [showLandscapePrompt, setShowLandscapePrompt] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
+  const [stage, setStage] = useState<'home' | 'prompt' | 'camera'>('home');
   const [capturedVideos, setCapturedVideos] = useState<string[]>([]);
 
-  const handleCapturedVideo = (videoUrl: string) => {
-    setCapturedVideos((prev) => [...prev, videoUrl]);
-    setShowCamera(false);
-  };
-
-  const handleStartScan = () => {
-    setShowLandscapePrompt(true);
-  };
-
-  const handleLandscapeContinue = () => {
-    setShowLandscapePrompt(false);
-    setShowCamera(true);
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4 md:p-8">
-      <div className="max-w-2xl mx-auto">
+    <div style={{ minHeight: '100vh', background: '#080c10', fontFamily: "'DM Sans', sans-serif", color: 'white', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, background: 'radial-gradient(ellipse 60% 40% at 30% 20%, rgba(0,212,122,0.06) 0%, transparent 60%), radial-gradient(ellipse 50% 50% at 80% 80%, rgba(0,100,255,0.04) 0%, transparent 60%)' }} />
+      <svg style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', opacity: 0.035, zIndex: 0, pointerEvents: 'none' }}>
+        <defs><pattern id="hg" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#00d47a" strokeWidth="0.5" />
+        </pattern></defs>
+        <rect width="100%" height="100%" fill="url(#hg)" />
+      </svg>
 
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 440, margin: '0 auto', padding: '0 24px 48px' }}>
         {/* Header */}
-        <div className="text-center mb-12 pt-8">
-          <div className="inline-block">
-            <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">Apollo</h1>
-            <div className="h-1 bg-gradient-to-r from-blue-400 to-green-400 rounded-full" />
+        <div style={{ paddingTop: 64, marginBottom: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,212,122,0.12)', border: '1px solid rgba(0,212,122,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d47a" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="3" /><path d="M2 12h3M19 12h3M12 2v3M12 19v3" />
+              </svg>
+            </div>
+            <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase' }}>APOLLO SYSTEM</span>
           </div>
-          <p className="text-blue-200 mt-4 text-lg">Tyre Tread Analysis System</p>
+          <h1 style={{ fontSize: 42, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-1.5px', lineHeight: 1.1 }}>
+            Tread<span style={{ color: '#00d47a' }}>Scan</span>
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, margin: 0, lineHeight: 1.6 }}>
+            AI-powered tyre tread depth analysis in 8 seconds
+          </p>
         </div>
 
-        {/* Scan Button */}
-        <button
-          onClick={handleStartScan}
-          className="w-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl shadow-2xl
-                     hover:shadow-blue-500/50 p-10 border border-blue-400/30 hover:border-blue-400/60
-                     transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] group"
-        >
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-white/20 rounded-full blur-xl group-hover:blur-2xl transition-all" />
-              <div className="relative w-20 h-20 bg-white rounded-full flex items-center justify-center
-                              shadow-lg group-hover:shadow-white/50 transition-all">
-                <Video className="w-10 h-10 text-blue-600" />
+        {/* Scan CTA */}
+        <button onClick={() => setStage('prompt')} style={{ width: '100%', background: 'none', border: '1px solid rgba(0,212,122,0.2)', borderRadius: 20, padding: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative', marginBottom: 24 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,212,122,0.08) 0%, rgba(0,100,200,0.04) 100%)' }} />
+          <div style={{ position: 'relative', padding: '36px 32px' }}>
+            <div style={{ marginBottom: 28, display: 'flex', justifyContent: 'center' }}>
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', inset: -12, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.15)', animation: 'ringPulse 2.5s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', inset: -24, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.07)', animation: 'ringPulse 2.5s ease-in-out infinite 0.5s' }} />
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#00d47a" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" />
+                  </svg>
+                </div>
               </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Start Tyre Scan</h2>
-              <p className="text-blue-100 text-sm">Capture 8-second video of tyre tread</p>
-            </div>
-            <div className="flex items-center gap-4 text-blue-100 text-sm">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                <span>8 seconds</span>
-              </div>
-              <div className="w-1 h-1 bg-blue-300 rounded-full" />
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                <span>Landscape mode</span>
-              </div>
-              <div className="w-1 h-1 bg-blue-300 rounded-full" />
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                <span>HD quality</span>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, letterSpacing: '0.25em', margin: '0 0 8px', textTransform: 'uppercase' }}>Tap to begin</p>
+              <h2 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.5px' }}>Start Tyre Scan</h2>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, margin: '0 0 24px' }}>8-second guided video capture</p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {['Landscape mode', 'HD capture', 'Auto-timed'].map(f => (
+                  <span key={f} style={{ padding: '4px 12px', borderRadius: 20, background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)', color: 'rgba(0,212,122,0.8)', fontSize: 11, fontWeight: 500 }}>{f}</span>
+                ))}
               </div>
             </div>
           </div>
         </button>
 
-        {/* Recent Scans */}
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 32 }}>
+          {[{ value: '±0.1', unit: 'mm', label: 'Accuracy' }, { value: '8', unit: 's', label: 'Scan time' }, { value: '4K', unit: '', label: 'Resolution' }].map(s => (
+            <div key={s.label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '16px 12px', textAlign: 'center' }}>
+              <div style={{ marginBottom: 2 }}>
+                <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.5px' }}>{s.value}</span>
+                <span style={{ fontSize: 11, color: '#00d47a', fontWeight: 600 }}>{s.unit}</span>
+              </div>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, margin: 0 }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Recent scans */}
         {capturedVideos.length > 0 && (
-          <div className="mt-8">
-            <h3 className="text-white text-xl font-semibold mb-4">Recent Scans</h3>
-            <div className="grid gap-4">
-              {capturedVideos.map((videoUrl, index) => (
-                <div key={index} className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                  <video src={videoUrl} controls className="w-full rounded-lg" />
-                  <p className="text-white/70 text-sm mt-2">Scan {capturedVideos.length - index}</p>
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'rgba(255,255,255,0.7)' }}>Recent Scans</h3>
+              <span style={{ padding: '2px 10px', borderRadius: 20, background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)', color: '#00d47a', fontSize: 11 }}>{capturedVideos.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {capturedVideos.map((url, i) => (
+                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 12 }}>
+                  <video src={url} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+                  <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Captured</span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Instructions */}
-        <div className="mt-12 bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-          <h3 className="text-white text-lg font-semibold mb-4">📋 How to Scan</h3>
-          <ol className="space-y-3 text-blue-100">
-            <li className="flex gap-3">
-              <span className="font-bold text-blue-400">1.</span>
-              <span>Tap "Start Tyre Scan" and rotate your phone to landscape</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="font-bold text-blue-400">2.</span>
-              <span>Position tyre horizontally and align tread within the green frame</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="font-bold text-blue-400">3.</span>
-              <span>Tap record and slowly move left to right</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="font-bold text-blue-400">4.</span>
-              <span>Keep movement steady for 8 seconds</span>
-            </li>
-          </ol>
+        {/* How to */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
+          {[
+            ['Tap "Start Tyre Scan"', 'Launches the guided landscape scanner'],
+            ['Rotate phone to landscape', 'Wider view captures the full tread'],
+            ['Align tread in green frame', 'Center the tyre in the scan zone'],
+            ['Sweep slowly left to right', 'Records 8 seconds — auto-stops'],
+          ].map(([title, desc], i) => (
+            <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
+              <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00d47a', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+              <div>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 500, margin: '0 0 2px' }}>{title}</p>
+                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, margin: 0 }}>{desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Landscape Prompt */}
-      {showLandscapePrompt && (
-        <LandscapePrompt
-          onContinue={handleLandscapeContinue}
-          onClose={() => setShowLandscapePrompt(false)}
-        />
-      )}
+      {stage === 'prompt' && <LandscapePrompt onContinue={() => setStage('camera')} onClose={() => setStage('home')} />}
+      {stage === 'camera' && <CameraCapture onCapture={(url) => { setCapturedVideos(p => [url, ...p]); setStage('home'); }} onClose={() => setStage('home')} />}
 
-      {/* Camera */}
-      {showCamera && (
-        <CameraCapture
-          onCapture={handleCapturedVideo}
-          onClose={() => setShowCamera(false)}
-        />
-      )}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        @keyframes ringPulse { 0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.15);opacity:0.2} }
+      `}</style>
     </div>
   );
 };
