@@ -104,7 +104,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-50 overflow-hidden rotate-90">
+    <div className="fixed inset-0 bg-black z-50 overflow-hidden">
       {/* Live Camera Feed */}
       <video
         ref={videoRef}
