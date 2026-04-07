@@ -183,7 +183,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         top: '50%',
         transform: 'translate(-50%, -50%)',
         width: 'min(72%, calc(100% * 6 / 7 * 0.72))',
-        aspectRatio: '3 / 7',
+        aspectRatio: '6 / 7',
         pointerEvents: 'none',
         zIndex: 15,
       }}>
