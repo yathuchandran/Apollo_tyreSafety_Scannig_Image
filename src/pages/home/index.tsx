@@ -176,82 +176,217 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         zIndex: 5,
       }} />
 
-      {/* ══ SCAN FRAME — positioned relative to the 6:7 camera container ══ */}
+      {/* ══ CURVED SCAN FRAME — inspired by the reference image ══ */}
       <div style={{
         position: 'absolute',
         left: '50%',
         top: '50%',
         transform: 'translate(-50%, -50%)',
-        width: 'min(72%, calc(100% * 6 / 7 * 0.72))',
+        width: 'min(82%, calc(100% * 6 / 7 * 0.82))',
         aspectRatio: '3.7 / 7',
         pointerEvents: 'none',
         zIndex: 15,
       }}>
+        {/* Curved frame SVG */}
         <svg
-          viewBox="0 0 270 630"
+          viewBox="0 0 280 630"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
         >
-          <rect x="0" y="0" width="270" height="630" rx="4" fill="rgba(0,212,122,0.03)" />
-          <rect
-            x="0.75" y="0.75" width="268.5" height="628.5" rx="4"
-            fill="none" stroke="rgba(0,212,122,0.7)" strokeWidth="1.5" strokeDasharray="10 5"
-            style={{ animation: 'dashMove 3s linear infinite' }}
+          <defs>
+            <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="#00d47a" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.9" />
+            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Background tint */}
+          <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
+
+          {/* Main curved border - top left */}
+          <path
+            d="M 20 10 L 60 10 Q 70 10 70 20 L 70 50"
+            fill="none"
+            stroke="url(#frameGrad)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            filter="url(#glow)"
+          />
+          {/* Main curved border - top right */}
+          <path
+            d="M 260 10 L 220 10 Q 210 10 210 20 L 210 50"
+            fill="none"
+            stroke="url(#frameGrad)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            filter="url(#glow)"
+          />
+          {/* Main curved border - bottom left */}
+          <path
+            d="M 20 620 L 60 620 Q 70 620 70 610 L 70 580"
+            fill="none"
+            stroke="url(#frameGrad)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            filter="url(#glow)"
+          />
+          {/* Main curved border - bottom right */}
+          <path
+            d="M 260 620 L 220 620 Q 210 620 210 610 L 210 580"
+            fill="none"
+            stroke="url(#frameGrad)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            filter="url(#glow)"
           />
 
-          {/* Horizontal guide lines */}
+          {/* Secondary curved lines (inner glow lines) */}
+          <path
+            d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 252 18 L 222 18 Q 218 18 218 22 L 218 48"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 28 612 L 58 612 Q 62 612 62 608 L 62 582"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 252 612 L 222 612 Q 218 612 218 608 L 218 582"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+
+          {/* Horizontal guide lines - subtle */}
           {[126, 210, 315, 420, 504].map((y, i) => (
             <line
-              key={y} x1="0" y1={y} x2="270" y2={y}
+              key={y}
+              x1="15"
+              y1={y}
+              x2="265"
+              y2={y}
               stroke="#00d47a"
-              strokeWidth={i === 2 ? 1.5 : 0.8}
-              opacity={i === 2 ? 0.5 : 0.18}
+              strokeWidth={i === 2 ? 1.2 : 0.6}
+              opacity={i === 2 ? 0.35 : 0.12}
+              strokeDasharray={i === 2 ? "none" : "4 6"}
             />
           ))}
 
-          {/* Tick marks */}
+          {/* Center crosshair */}
+          <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
+            <animate attributeName="opacity" values="0.2;0.9;0.2" dur="2s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="140" cy="315" r="3" fill="#00d47a" opacity="0.5">
+            <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite" />
+          </circle>
+          <line x1="122" y1="315" x2="158" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
+          <line x1="140" y1="297" x2="140" y2="333" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
+
+          {/* Tick marks on sides */}
           {[126, 210, 315, 420, 504].map((y, i) => (
-            <g key={`t${y}`}>
-              <line x1="0" y1={y} x2={i === 2 ? -14 : -9} y2={y} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
-              <line x1="270" y1={y} x2={i === 2 ? 284 : 279} y2={y} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
+            <g key={`tick-${y}`}>
+              <line
+                x1="12"
+                y1={y}
+                x2={i === 2 ? 20 : 17}
+                y2={y}
+                stroke="#00d47a"
+                strokeWidth={i === 2 ? 2 : 1}
+                opacity="0.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="268"
+                y1={y}
+                x2={i === 2 ? 260 : 263}
+                y2={y}
+                stroke="#00d47a"
+                strokeWidth={i === 2 ? 2 : 1}
+                opacity="0.5"
+                strokeLinecap="round"
+              />
             </g>
           ))}
-
-          {/* Center crosshair */}
-          <circle cx="135" cy="315" r="6" fill="none" stroke="#00d47a" strokeWidth="1.5">
-            <animate attributeName="opacity" values="0.15;0.85;0.15" dur="2s" repeatCount="indefinite" />
-          </circle>
-          <line x1="120" y1="315" x2="150" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
-          <line x1="135" y1="300" x2="135" y2="330" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
 
           {/* Scanning beam */}
           {isRecording && (
             <line
-              x1="0" y1={`${scanPct * 6.3}`} x2="270" y2={`${scanPct * 6.3}`}
-              stroke="#00d47a" strokeWidth="2" opacity="0.8"
+              x1="12"
+              y1={scanPct * 6.3}
+              x2="268"
+              y2={scanPct * 6.3}
+              stroke="#00d47a"
+              strokeWidth="2.5"
+              opacity="0.85"
+              filter="url(#glow)"
             >
-              <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.5s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.3;0.95;0.3" dur="0.4s" repeatCount="indefinite" />
             </line>
           )}
+
+          {/* Animated dash border around the frame */}
+          <rect
+            x="8"
+            y="8"
+            width="264"
+            height="614"
+            rx="12"
+            fill="none"
+            stroke="rgba(0,212,122,0.25)"
+            strokeWidth="1"
+            strokeDasharray="8 6"
+            style={{ animation: 'dashMove 4s linear infinite' }}
+          />
         </svg>
 
-        {/* Corner L-brackets */}
+        {/* Corner L-brackets - matching the curved aesthetic */}
         {([
-          { top: -2, left: -2, borderTop: '2.5px solid #00d47a', borderLeft: '2.5px solid #00d47a' },
-          { top: -2, right: -2, borderTop: '2.5px solid #00d47a', borderRight: '2.5px solid #00d47a' },
-          { bottom: -2, left: -2, borderBottom: '2.5px solid #00d47a', borderLeft: '2.5px solid #00d47a' },
-          { bottom: -2, right: -2, borderBottom: '2.5px solid #00d47a', borderRight: '2.5px solid #00d47a' },
+          { top: -2, left: -2, borderTop: '3px solid #00d47a', borderLeft: '3px solid #00d47a', borderRadius: '6px 0 0 0' },
+          { top: -2, right: -2, borderTop: '3px solid #00d47a', borderRight: '3px solid #00d47a', borderRadius: '0 6px 0 0' },
+          { bottom: -2, left: -2, borderBottom: '3px solid #00d47a', borderLeft: '3px solid #00d47a', borderRadius: '0 0 0 6px' },
+          { bottom: -2, right: -2, borderBottom: '3px solid #00d47a', borderRight: '3px solid #00d47a', borderRadius: '0 0 6px 0' },
         ] as React.CSSProperties[]).map((s, i) => (
-          <div key={i} style={{ position: 'absolute', width: 22, height: 22, ...s }} />
+          <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...s, filter: 'drop-shadow(0 0 4px rgba(0,212,122,0.5))' }} />
         ))}
 
         {/* Frame label */}
         <div style={{
-          position: 'absolute', top: -30, left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+          position: 'absolute', top: -32, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          padding: '4px 12px',
+          borderRadius: 20,
+          border: '1px solid rgba(0,212,122,0.3)',
         }}>
           <div style={{
-            width: 6, height: 6, borderRadius: '50%',
+            width: 7, height: 7, borderRadius: '50%',
             background: isRecording ? '#ef4444' : '#00d47a',
+            boxShadow: `0 0 6px ${isRecording ? '#ef4444' : '#00d47a'}`,
             animation: 'blink 1s ease-in-out infinite',
           }} />
           <span style={{
