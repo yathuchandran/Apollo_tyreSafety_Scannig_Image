@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 // ─── CAMERA CAPTURE ──────────────────────────────────────────────────────────
 interface CameraCaptureProps {
@@ -12,13 +12,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(8);
-  const [recordingComplete, setRecordingComplete] = useState(false);
-  const [scanPct, setScanPct] = useState(0);
+  const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [timeLeft, setTimeLeft] = useState<number>(8);
+  const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
+  const [scanPct, setScanPct] = useState<number>(0);
 
-  // Animate scan line
+  // Animate vertical scan line
   useEffect(() => {
     if (!isRecording) { setScanPct(0); return; }
     let x = 0; let dir = 1;
@@ -35,7 +35,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1080 },
+            height: { ideal: 1920 },
+          },
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -48,17 +52,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       }
     };
     startCamera();
-    return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
+    return () => {
+      streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+    };
   }, [onClose]);
 
   const startRecording = () => {
     if (!streamRef.current || isRecording || !isCameraReady) return;
     if (navigator.vibrate) navigator.vibrate(100);
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm';
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+      ? 'video/webm;codecs=vp8'
+      : 'video/webm';
     const mr = new MediaRecorder(streamRef.current, { mimeType });
     mediaRecorderRef.current = mr;
     chunksRef.current = [];
-    mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    mr.ondataavailable = (e: BlobEvent) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
     mr.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
       setRecordingComplete(true);
@@ -77,199 +87,246 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const progress = ((8 - timeLeft) / 8) * 100;
   const circ = 2 * Math.PI * 28;
 
-  // The trick: we render a tall portrait container, then rotate it 90deg
-  // so the camera + UI appear in landscape orientation together
   return (
     <div style={{
       position: 'absolute', inset: 0, background: '#000', zIndex: 50,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/*
-        Inner div: portrait dimensions swapped to landscape via rotate(90deg).
-        width = 100vh  (becomes the landscape "width" after rotation)
-        height = 100vw (becomes the landscape "height" after rotation)
-        This makes camera feed + all HUD elements rotate in perfect sync.
-      */}
+      {/* Camera feed — no rotation, pure portrait */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{
+          position: 'absolute', inset: 0,
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+        }}
+      />
+
+      {/* Vignette */}
       <div style={{
-        width: '100vh',
-        height: '100vw',
-        transform: 'rotate(90deg)',
-        transformOrigin: '50% 50%',
-        position: 'relative',
-        overflow: 'hidden',
-        flexShrink: 0,
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 90% 130% at 50% 50%, transparent 30%, rgba(0,0,0,0.65) 100%)',
+      }} />
+
+      {/* Top gradient */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 100,
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.82), transparent)',
+        pointerEvents: 'none',
+      }} />
+      {/* Bottom gradient */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: 120,
+        background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ══ SCAN FRAME — portrait rectangle ══ */}
+      <div style={{
+        position: 'absolute',
+        left: '50%', top: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '72%',
+        aspectRatio: '3 / 7',
+        pointerEvents: 'none',
       }}>
-        {/* ── Camera feed fills this rotated container ── */}
-        <video
-          ref={videoRef} autoPlay playsInline muted
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        />
+        <svg
+          viewBox="0 0 270 630"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
+        >
+          <rect x="0" y="0" width="270" height="630" rx="4" fill="rgba(0,212,122,0.03)" />
+          <rect
+            x="0.75" y="0.75" width="268.5" height="628.5" rx="4"
+            fill="none" stroke="rgba(0,212,122,0.7)" strokeWidth="1.5" strokeDasharray="10 5"
+            style={{ animation: 'dashMove 3s linear infinite' }}
+          />
 
-        {/* Vignette */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'radial-gradient(ellipse 130% 90% at 50% 50%, transparent 30%, rgba(0,0,0,0.65) 100%)' }} />
-
-        {/* Top bar gradient */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 90,
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.78), transparent)', pointerEvents: 'none' }} />
-        {/* Bottom bar gradient */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
-          background: 'linear-gradient(to top, rgba(0,0,0,0.82), transparent)', pointerEvents: 'none' }} />
-
-        {/* ══ SCANNER FRAME — centered wide rectangle ══ */}
-        <div style={{
-          position: 'absolute', left: '50%', top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '80%',
-          aspectRatio: '16 / 4.5',
-          pointerEvents: 'none',
-        }}>
-          <svg viewBox="0 0 640 180" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
-            {/* Frame fill */}
-            <rect x="0" y="0" width="640" height="180" rx="3" fill="rgba(0,212,122,0.03)" />
-            {/* Dashed border */}
-            <rect x="0.75" y="0.75" width="638.5" height="178.5" rx="3" fill="none"
-              stroke="rgba(0,212,122,0.7)" strokeWidth="1.5" strokeDasharray="10 5"
-              style={{ animation: 'dashMove 3s linear infinite' }} />
-            {/* Guide verticals */}
-            {[128, 256, 320, 384, 512].map((x, i) => (
-              <line key={x} x1={x} y1="0" x2={x} y2="180"
-                stroke="#00d47a" strokeWidth={i === 2 ? 1.5 : 0.8} opacity={i === 2 ? 0.5 : 0.18} />
-            ))}
-            {/* Tick marks */}
-            {[128, 256, 320, 384, 512].map((x, i) => (
-              <g key={`t${x}`}>
-                <line x1={x} y1="0" x2={x} y2={i === 2 ? -14 : -9} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
-                <line x1={x} y1="180" x2={x} y2={i === 2 ? 194 : 189} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
-              </g>
-            ))}
-            {/* Center crosshair */}
-            <circle cx="320" cy="90" r="5" fill="none" stroke="#00d47a" strokeWidth="1.5">
-              <animate attributeName="opacity" values="0.15;0.85;0.15" dur="2s" repeatCount="indefinite" />
-            </circle>
-            <line x1="308" y1="90" x2="332" y2="90" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
-            <line x1="320" y1="78" x2="320" y2="102" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
-            {/* Scanning beam */}
-            {isRecording && (
-              <line x1={`${scanPct * 6.4}`} y1="0" x2={`${scanPct * 6.4}`} y2="180"
-                stroke="#00d47a" strokeWidth="2" opacity="0.8">
-                <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.5s" repeatCount="indefinite" />
-              </line>
-            )}
-          </svg>
-
-          {/* Corner L-brackets */}
-          {[
-            { top: -2, left: -2, borderTop: '2.5px solid #00d47a', borderLeft: '2.5px solid #00d47a' },
-            { top: -2, right: -2, borderTop: '2.5px solid #00d47a', borderRight: '2.5px solid #00d47a' },
-            { bottom: -2, left: -2, borderBottom: '2.5px solid #00d47a', borderLeft: '2.5px solid #00d47a' },
-            { bottom: -2, right: -2, borderBottom: '2.5px solid #00d47a', borderRight: '2.5px solid #00d47a' },
-          ].map((s, i) => (
-            <div key={i} style={{ position: 'absolute', width: 22, height: 22, ...s }} />
+          {/* Horizontal guide lines */}
+          {[126, 210, 315, 420, 504].map((y, i) => (
+            <line
+              key={y} x1="0" y1={y} x2="270" y2={y}
+              stroke="#00d47a"
+              strokeWidth={i === 2 ? 1.5 : 0.8}
+              opacity={i === 2 ? 0.5 : 0.18}
+            />
           ))}
 
-          {/* Frame label */}
-          <div style={{ position: 'absolute', top: -28, left: '50%', transform: 'translateX(-50%)',
-            display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: isRecording ? '#ef4444' : '#00d47a',
-              animation: 'blink 1s ease-in-out infinite',
-            }} />
-            <span style={{ color: '#00d47a', fontSize: 10, fontWeight: 600, letterSpacing: '0.2em',
-              textTransform: 'uppercase', fontFamily: 'monospace' }}>
-              {isRecording ? 'SCANNING' : 'ALIGN TYRE TREAD'}
-            </span>
-          </div>
-        </div>
+          {/* Tick marks */}
+          {[126, 210, 315, 420, 504].map((y, i) => (
+            <g key={`t${y}`}>
+              <line x1="0" y1={y} x2={i === 2 ? -14 : -9} y2={y} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
+              <line x1="270" y1={y} x2={i === 2 ? 284 : 279} y2={y} stroke="#00d47a" strokeWidth={i === 2 ? 2 : 1.2} opacity="0.45" />
+            </g>
+          ))}
 
-        {/* ══ TOP BAR ══ */}
+          {/* Center crosshair */}
+          <circle cx="135" cy="315" r="6" fill="none" stroke="#00d47a" strokeWidth="1.5">
+            <animate attributeName="opacity" values="0.15;0.85;0.15" dur="2s" repeatCount="indefinite" />
+          </circle>
+          <line x1="120" y1="315" x2="150" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
+          <line x1="135" y1="300" x2="135" y2="330" stroke="#00d47a" strokeWidth="0.8" opacity="0.35" />
+
+          {/* Scanning beam */}
+          {isRecording && (
+            <line
+              x1="0" y1={`${scanPct * 6.3}`} x2="270" y2={`${scanPct * 6.3}`}
+              stroke="#00d47a" strokeWidth="2" opacity="0.8"
+            >
+              <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.5s" repeatCount="indefinite" />
+            </line>
+          )}
+        </svg>
+
+        {/* Corner L-brackets */}
+        {([
+          { top: -2, left: -2, borderTop: '2.5px solid #00d47a', borderLeft: '2.5px solid #00d47a' },
+          { top: -2, right: -2, borderTop: '2.5px solid #00d47a', borderRight: '2.5px solid #00d47a' },
+          { bottom: -2, left: -2, borderBottom: '2.5px solid #00d47a', borderLeft: '2.5px solid #00d47a' },
+          { bottom: -2, right: -2, borderBottom: '2.5px solid #00d47a', borderRight: '2.5px solid #00d47a' },
+        ] as React.CSSProperties[]).map((s, i) => (
+          <div key={i} style={{ position: 'absolute', width: 22, height: 22, ...s }} />
+        ))}
+
+        {/* Frame label */}
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, padding: '14px 20px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'absolute', top: -30, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
         }}>
-          <button onClick={onClose} disabled={isRecording} style={{
+          <div style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: isRecording ? '#ef4444' : '#00d47a',
+            animation: 'blink 1s ease-in-out infinite',
+          }} />
+          <span style={{
+            color: '#00d47a', fontSize: 10, fontWeight: 600,
+            letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace',
+          }}>
+            {isRecording ? 'SCANNING' : 'ALIGN TYRE TREAD'}
+          </span>
+        </div>
+      </div>
+
+      {/* ══ TOP BAR ══ */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        padding: '14px 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <button
+          onClick={onClose}
+          disabled={isRecording}
+          style={{
             width: 42, height: 42, borderRadius: 12,
             background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
             color: isRecording ? 'rgba(255,255,255,0.25)' : 'white',
             fontSize: 18, cursor: isRecording ? 'not-allowed' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>✕</button>
+          }}
+        >✕</button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 7, height: 7, borderRadius: '50%',
-              background: isRecording ? '#ef4444' : '#00d47a',
-              boxShadow: isRecording ? '0 0 8px rgba(239,68,68,0.9)' : '0 0 8px rgba(0,212,122,0.9)',
-              animation: 'blink 1s ease-in-out infinite',
-            }} />
-            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: '0.2em', fontFamily: 'monospace' }}>
-              {isRecording ? 'REC' : 'APOLLO'}
-            </span>
-          </div>
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
-            padding: '6px 14px', borderRadius: 20,
-            background: isRecording ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.08)',
-            border: `1px solid ${isRecording ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.15)'}`,
-          }}>
-            <span style={{ color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 600, fontFamily: 'monospace' }}>
-              {isRecording ? `0:0${timeLeft}` : '0:08'}
-            </span>
-          </div>
+            width: 7, height: 7, borderRadius: '50%',
+            background: isRecording ? '#ef4444' : '#00d47a',
+            boxShadow: isRecording ? '0 0 8px rgba(239,68,68,0.9)' : '0 0 8px rgba(0,212,122,0.9)',
+            animation: 'blink 1s ease-in-out infinite',
+          }} />
+          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: '0.2em', fontFamily: 'monospace' }}>
+            {isRecording ? 'REC' : 'APOLLO'}
+          </span>
         </div>
 
-        {/* ══ BOTTOM BAR ══ */}
         <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '6px 14px', borderRadius: 20,
+          background: isRecording ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.08)',
+          border: `1px solid ${isRecording ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.15)'}`,
         }}>
-          {/* Left: hint / progress */}
-          <div style={{ minWidth: 120 }}>
-            {!isRecording && isCameraReady && (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <div style={{ display: 'flex', gap: 3, animation: 'slideRight 2s ease-in-out infinite' }}>
-                    {[0,1,2].map(i => (
-                      <div key={i} style={{ width: 16, height: 2, borderRadius: 1, background: `rgba(0,212,122,${0.3 + i * 0.3})` }} />
-                    ))}
-                  </div>
-                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Sweep left → right</span>
-                </div>
-                <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: 10 }}>Hold phone steady & flat</span>
-              </div>
-            )}
-            {isRecording && (
-              <div>
-                <div style={{ width: 110, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 5 }}>
-                  <div style={{
-                    height: '100%', borderRadius: 2,
-                    background: 'linear-gradient(90deg, #00c46e, #00d47a)',
-                    width: `${progress}%`, transition: 'width 1s linear',
+          <span style={{
+            color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.5)',
+            fontSize: 12, fontWeight: 600, fontFamily: 'monospace',
+          }}>
+            {isRecording ? `0:0${timeLeft}` : '0:08'}
+          </span>
+        </div>
+      </div>
+
+      {/* ══ BOTTOM BAR ══ */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        padding: '16px 28px 28px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+      }}>
+        {/* Progress / hint */}
+        {!isRecording && isCameraReady && (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{
+                    width: 16, height: 2, borderRadius: 1,
+                    background: `rgba(0,212,122,${0.3 + i * 0.3})`,
                   }} />
-                </div>
-                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>{8 - timeLeft}s of 8s captured</span>
+                ))}
               </div>
-            )}
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Hold steady · aim at tread</span>
+            </div>
+          </div>
+        )}
+        {isRecording && (
+          <div style={{ width: '100%', maxWidth: 200 }}>
+            <div style={{
+              width: '100%', height: 3, borderRadius: 2,
+              background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 5,
+            }}>
+              <div style={{
+                height: '100%', borderRadius: 2,
+                background: 'linear-gradient(90deg, #00c46e, #00d47a)',
+                width: `${progress}%`, transition: 'width 1s linear',
+              }} />
+            </div>
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+              {8 - timeLeft}s of 8s captured
+            </span>
+          </div>
+        )}
+
+        {/* Record button row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          {/* Left badge */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '5px 10px', borderRadius: 8,
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+          }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>HD · ENV</span>
           </div>
 
-          {/* Center: record button */}
+          {/* Center record button */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <button onClick={startRecording}
+            <button
+              onClick={startRecording}
               disabled={!isCameraReady || isRecording || recordingComplete}
               style={{
                 position: 'relative', background: 'none', border: 'none', padding: 0,
                 cursor: (!isCameraReady || isRecording || recordingComplete) ? 'not-allowed' : 'pointer',
                 opacity: (!isCameraReady || isRecording || recordingComplete) ? 0.4 : 1,
-              }}>
+              }}
+            >
               {isRecording && (
                 <svg style={{ position: 'absolute', inset: -6, width: 76, height: 76 }} viewBox="0 0 76 76">
                   <circle cx="38" cy="38" r="28" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-                  <circle cx="38" cy="38" r="28" fill="none" stroke="#ef4444" strokeWidth="3"
+                  <circle
+                    cx="38" cy="38" r="28" fill="none" stroke="#ef4444" strokeWidth="3"
                     strokeLinecap="round" strokeDasharray={circ}
                     strokeDashoffset={circ - (circ * progress) / 100}
-                    transform="rotate(-90 38 38)" style={{ transition: 'stroke-dashoffset 1s linear' }} />
+                    transform="rotate(-90 38 38)"
+                    style={{ transition: 'stroke-dashoffset 1s linear' }}
+                  />
                 </svg>
               )}
               <div style={{
@@ -296,72 +353,60 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </span>
           </div>
 
-          {/* Right: badge */}
-          <div style={{ textAlign: 'right', minWidth: 80 }}>
+          {/* Right spacer */}
+          <div style={{ width: 72 }} />
+        </div>
+      </div>
+
+      {/* ══ SCAN COMPLETE ══ */}
+      {recordingComplete && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.3s ease',
+        }}>
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+            animation: 'scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+          }}>
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '5px 10px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'rgba(0,212,122,0.12)', border: '2px solid rgba(0,212,122,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>HD · ENV</span>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <path d="M7 16l6 6 12-12" stroke="#00d47a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing video…</p>
             </div>
           </div>
         </div>
+      )}
 
-        {/* ══ SCAN COMPLETE ══ */}
-        {recordingComplete && (
-          <div style={{
-            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            animation: 'fadeIn 0.3s ease',
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
-              animation: 'scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'rgba(0,212,122,0.12)', border: '2px solid rgba(0,212,122,0.5)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M7 16l6 6 12-12" stroke="#00d47a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing video…</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <style>{`
-          @keyframes dashMove { to { stroke-dashoffset: -30; } }
-          @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-          @keyframes slideRight {
-            0%{transform:translateX(-4px);opacity:0.4}
-            50%{transform:translateX(4px);opacity:1}
-            100%{transform:translateX(-4px);opacity:0.4}
-          }
-          @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-          @keyframes scaleIn {
-            from{transform:scale(0.5);opacity:0}
-            60%{transform:scale(1.06)}
-            to{transform:scale(1);opacity:1}
-          }
-        `}</style>
-      </div>
+      <style>{`
+        @keyframes dashMove { to { stroke-dashoffset: -30; } }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes scaleIn {
+          from{transform:scale(0.5);opacity:0}
+          60%{transform:scale(1.06)}
+          to{transform:scale(1);opacity:1}
+        }
+      `}</style>
     </div>
   );
 };
 
-// ─── LANDSCAPE PROMPT ────────────────────────────────────────────────────────
-interface LandscapePromptProps {
+// ─── INSTRUCTIONS PROMPT ─────────────────────────────────────────────────────
+interface InstructionsPromptProps {
   onContinue: () => void;
   onClose: () => void;
 }
 
-const LandscapePrompt: React.FC<LandscapePromptProps> = ({ onContinue, onClose }) => (
+const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onClose }) => (
   <div style={{
     position: 'absolute', inset: 0, zIndex: 40,
     background: '#080c10',
@@ -376,9 +421,11 @@ const LandscapePrompt: React.FC<LandscapePromptProps> = ({ onContinue, onClose }
     }} />
     {/* Grid */}
     <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.04, pointerEvents: 'none' }}>
-      <defs><pattern id="pg" width="32" height="32" patternUnits="userSpaceOnUse">
-        <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#00d47a" strokeWidth="0.5" />
-      </pattern></defs>
+      <defs>
+        <pattern id="pg" width="32" height="32" patternUnits="userSpaceOnUse">
+          <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#00d47a" strokeWidth="0.5" />
+        </pattern>
+      </defs>
       <rect width="100%" height="100%" fill="url(#pg)" />
     </svg>
 
@@ -398,47 +445,43 @@ const LandscapePrompt: React.FC<LandscapePromptProps> = ({ onContinue, onClose }
       </span>
     </div>
 
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 36, padding: '0 32px', maxWidth: 360, width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, padding: '0 32px', maxWidth: 360, width: '100%' }}>
 
-      {/* Rotating phone */}
-      <div style={{ position: 'relative', width: 150, height: 150 }}>
+      {/* Phone icon */}
+      <div style={{ position: 'relative', width: 120, height: 120 }}>
         <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.15)', animation: 'spin 12s linear infinite' }} />
         <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', border: '1px dashed rgba(0,212,122,0.1)', animation: 'spin 8s linear infinite reverse' }} />
-        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,122,0.1) 0%, transparent 70%)' }} />
-        <div style={{
-          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'phoneRotate 3s cubic-bezier(0.4,0,0.2,1) infinite',
-        }}>
-          <svg width="48" height="82" viewBox="0 0 48 82" fill="none">
-            <rect x="1" y="1" width="46" height="80" rx="8" fill="rgba(0,212,122,0.06)" stroke="rgba(0,212,122,0.6)" strokeWidth="1.5" />
-            <rect x="6" y="10" width="36" height="54" rx="3" fill="rgba(0,212,122,0.04)" stroke="rgba(0,212,122,0.2)" strokeWidth="1" />
-            <rect x="18" y="70" width="12" height="3" rx="1.5" fill="rgba(0,212,122,0.4)" />
-            <circle cx="24" cy="5.5" r="1.5" fill="rgba(0,212,122,0.3)" />
-            <line x1="6" y1="37" x2="42" y2="37" stroke="rgba(0,212,122,0.3)" strokeWidth="0.8" strokeDasharray="3 2" />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,122,0.08) 0%, transparent 70%)' }} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="42" height="72" viewBox="0 0 42 72" fill="none">
+            <rect x="1" y="1" width="40" height="70" rx="7" fill="rgba(0,212,122,0.06)" stroke="rgba(0,212,122,0.6)" strokeWidth="1.5" />
+            <rect x="5" y="9" width="32" height="46" rx="3" fill="rgba(0,212,122,0.04)" stroke="rgba(0,212,122,0.2)" strokeWidth="1" />
+            <rect x="15" y="61" width="12" height="3" rx="1.5" fill="rgba(0,212,122,0.4)" />
+            <circle cx="21" cy="5" r="1.5" fill="rgba(0,212,122,0.3)" />
+            <line x1="5" y1="28" x2="37" y2="28" stroke="rgba(0,212,122,0.4)" strokeWidth="1" />
+            <line x1="5" y1="32" x2="37" y2="32" stroke="rgba(0,212,122,0.25)" strokeWidth="0.8" />
+            <line x1="5" y1="36" x2="37" y2="36" stroke="rgba(0,212,122,0.4)" strokeWidth="1" />
+            <line x1="5" y1="40" x2="37" y2="40" stroke="rgba(0,212,122,0.25)" strokeWidth="0.8" />
           </svg>
         </div>
-        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 150 150">
-          <path d="M 130 75 A 55 55 0 0 0 75 20" stroke="rgba(0,212,122,0.45)" strokeWidth="2" fill="none" strokeLinecap="round" strokeDasharray="8 4" style={{ animation: 'dashMove2 2s linear infinite' }} />
-          <polygon points="73,13 81,23 65,23" fill="rgba(0,212,122,0.65)" />
-        </svg>
       </div>
 
       {/* Text */}
       <div style={{ textAlign: 'center' }}>
-        <h2 style={{ color: '#fff', fontSize: 24, fontWeight: 600, margin: '0 0 10px', letterSpacing: '-0.5px' }}>
-          Rotate to Landscape
+        <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 600, margin: '0 0 10px', letterSpacing: '-0.5px' }}>
+          Ready to Scan
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-          Turn your phone sideways — the scanner captures the full tyre tread width in one pass.
+          Hold your phone in portrait mode and point the rear camera at the tyre tread surface.
         </p>
       </div>
 
       {/* Steps */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '↻', label: 'Rotate phone 90° to landscape' },
-          { icon: '◎', label: 'Align tread inside the green frame' },
-          { icon: '→', label: 'Sweep slowly left to right for 8s' },
+          { icon: '◎', label: 'Point rear camera at the tread' },
+          { icon: '▭', label: 'Align tread inside the green frame' },
+          { icon: '●', label: 'Tap scan — holds steady for 8 seconds' },
         ].map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -449,7 +492,7 @@ const LandscapePrompt: React.FC<LandscapePromptProps> = ({ onContinue, onClose }
               width: 30, height: 30, borderRadius: 8, flexShrink: 0,
               background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#00d47a', fontSize: 15,
+              color: '#00d47a', fontSize: 14,
             }}>{s.icon}</div>
             <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>{s.label}</span>
             <div style={{
@@ -481,12 +524,6 @@ const LandscapePrompt: React.FC<LandscapePromptProps> = ({ onContinue, onClose }
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
       @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-      @keyframes phoneRotate {
-        0%,25%  { transform: rotate(0deg); }
-        55%,85% { transform: rotate(-90deg); }
-        100%    { transform: rotate(0deg); }
-      }
-      @keyframes dashMove2 { to { stroke-dashoffset: -24; } }
     `}</style>
   </div>
 );
@@ -508,13 +545,14 @@ const Home: React.FC = () => {
         background: 'radial-gradient(ellipse 60% 40% at 30% 20%, rgba(0,212,122,0.06) 0%, transparent 60%), radial-gradient(ellipse 50% 50% at 80% 80%, rgba(0,100,255,0.04) 0%, transparent 60%)',
       }} />
       <svg style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', opacity: 0.035, zIndex: 0, pointerEvents: 'none' }}>
-        <defs><pattern id="hg" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#00d47a" strokeWidth="0.5" />
-        </pattern></defs>
+        <defs>
+          <pattern id="hg" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#00d47a" strokeWidth="0.5" />
+          </pattern>
+        </defs>
         <rect width="100%" height="100%" fill="url(#hg)" />
       </svg>
 
-      {/* Page content */}
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 440, margin: '0 auto', padding: '0 24px 48px' }}>
 
         {/* Header */}
@@ -567,7 +605,7 @@ const Home: React.FC = () => {
               <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Tyre Scan</h2>
               <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>8-second guided video capture</p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {['Landscape mode', 'HD capture', 'Auto-timed'].map(f => (
+                {['Portrait mode', 'HD capture', 'Auto-timed'].map(f => (
                   <span key={f} style={{
                     padding: '4px 12px', borderRadius: 20,
                     background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)',
@@ -581,7 +619,11 @@ const Home: React.FC = () => {
 
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 28 }}>
-          {[{ value: '±0.1', unit: 'mm', label: 'Accuracy' }, { value: '8', unit: 's', label: 'Scan time' }, { value: '4K', unit: '', label: 'Resolution' }].map(s => (
+          {[
+            { value: '±0.1', unit: 'mm', label: 'Accuracy' },
+            { value: '8', unit: 's', label: 'Scan time' },
+            { value: '4K', unit: '', label: 'Resolution' },
+          ].map(s => (
             <div key={s.label} style={{
               background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
               borderRadius: 14, padding: '14px 10px', textAlign: 'center',
@@ -617,12 +659,12 @@ const Home: React.FC = () => {
         {/* How it works */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20 }}>
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
-          {[
-            ['Tap "Start Tyre Scan"', 'Launches the guided landscape scanner'],
-            ['Rotate phone to landscape', 'Wider view captures the full tread'],
+          {([
+            ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
+            ['Hold phone in portrait mode', 'Point rear camera at the tyre tread'],
             ['Align tread in green frame', 'Centre the tyre in the scan zone'],
-            ['Sweep slowly left to right', 'Records 8 seconds then auto-stops'],
-          ].map(([title, desc], i) => (
+            ['Hold steady for 8 seconds', 'Records then auto-stops and saves'],
+          ] as [string, string][]).map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
               <div style={{
                 width: 24, height: 24, borderRadius: 6, flexShrink: 0,
@@ -639,16 +681,16 @@ const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Overlay screens — use absolute (not fixed) so they work in all environments */}
+      {/* Overlay screens */}
       {stage === 'prompt' && (
-        <LandscapePrompt
+        <InstructionsPrompt
           onContinue={() => setStage('camera')}
           onClose={() => setStage('home')}
         />
       )}
       {stage === 'camera' && (
         <CameraCapture
-          onCapture={url => { setCapturedVideos(p => [url, ...p]); setStage('home'); }}
+          onCapture={(url: string) => { setCapturedVideos((p: string[]) => [url, ...p]); setStage('home'); }}
           onClose={() => setStage('home')}
         />
       )}
