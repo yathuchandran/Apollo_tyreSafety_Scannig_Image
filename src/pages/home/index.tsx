@@ -37,8 +37,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'environment',
-            width: { ideal: 1080 },
-            height: { ideal: 1920 },
+            width: { ideal: 1280 },
+            height: { ideal: 960 },
+            aspectRatio: { exact: 4 / 3 },
           },
         });
         if (videoRef.current) {
@@ -47,8 +48,24 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           videoRef.current.onloadedmetadata = () => setIsCameraReady(true);
         }
       } catch {
-        alert('Camera access denied. Please enable camera permissions.');
-        onClose();
+        // Fallback without exact aspect ratio
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 960 },
+            },
+          });
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            streamRef.current = stream;
+            videoRef.current.onloadedmetadata = () => setIsCameraReady(true);
+          }
+        } catch {
+          alert('Camera access denied. Please enable camera permissions.');
+          onClose();
+        }
       }
     };
     startCamera();
@@ -102,7 +119,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       height: '100vh',
       width: '100vw',
     }}>
-      {/* Camera feed container - constrained height to prevent zoom */}
+      {/* Camera feed container - 4:3 aspect ratio */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -114,18 +131,28 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         justifyContent: 'center',
         overflow: 'hidden',
       }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{
-            width: 'auto',
-            height: '100%',
-            maxWidth: 'none',
-            objectFit: 'contain',
-          }}
-        />
+        <div style={{
+          width: '100%',
+          height: 'auto',
+          aspectRatio: '4 / 3',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        </div>
       </div>
 
       {/* Vignette */}
@@ -327,7 +354,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
           }}>
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>HD · ENV</span>
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>4:3 · HD</span>
           </div>
 
           {/* Center record button */}
