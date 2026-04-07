@@ -190,177 +190,90 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         {/* Curved frame SVG */}
         <svg
           viewBox="0 0 280 630"
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
         >
           <defs>
-            <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="leftGlow" x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
-              <stop offset="50%" stopColor="#00d47a" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.3" />
             </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+
+            <filter id="softGlow">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
           </defs>
 
-          {/* Background tint */}
-          <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
-
-          {/* Main curved border - top left */}
+          {/* ───────── MAIN LEFT CURVED EDGE (like tyre side) ───────── */}
           <path
-            d="M 20 10 L 60 10 Q 70 10 70 20 L 70 50"
+            d="M 30 20 
+       Q 10 120 25 220 
+       Q 45 320 25 420 
+       Q 10 520 30 610"
             fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
+            stroke="url(#leftGlow)"
+            strokeWidth="4"
             strokeLinecap="round"
-            filter="url(#glow)"
-          />
-          {/* Main curved border - top right */}
-          <path
-            d="M 260 10 L 220 10 Q 210 10 210 20 L 210 50"
-            fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#glow)"
-          />
-          {/* Main curved border - bottom left */}
-          <path
-            d="M 20 620 L 60 620 Q 70 620 70 610 L 70 580"
-            fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#glow)"
-          />
-          {/* Main curved border - bottom right */}
-          <path
-            d="M 260 620 L 220 620 Q 210 620 210 610 L 210 580"
-            fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#glow)"
+            filter="url(#softGlow)"
           />
 
-          {/* Secondary curved lines (inner glow lines) */}
+          {/* ───────── INNER PARALLEL CURVE ───────── */}
           <path
-            d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
+            d="M 45 30 
+       Q 30 120 40 220 
+       Q 55 320 40 420 
+       Q 30 520 45 600"
             fill="none"
             stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 252 18 L 222 18 Q 218 18 218 22 L 218 48"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 28 612 L 58 612 Q 62 612 62 608 L 62 582"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 252 612 L 222 612 Q 218 612 218 608 L 218 582"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
+            strokeOpacity="0.4"
+            strokeWidth="2"
             strokeLinecap="round"
           />
 
-          {/* Horizontal guide lines - subtle */}
-          {[126, 210, 315, 420, 504].map((y, i) => (
+          {/* ───────── ROUGH EDGE DETAIL (hand-drawn feel) ───────── */}
+          <path
+            d="M 25 40 
+       Q 5 130 20 240 
+       Q 35 330 20 440 
+       Q 5 530 25 620"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.25"
+            strokeWidth="1.2"
+            strokeDasharray="4 6"
+            strokeLinecap="round"
+          />
+
+          {/* ───────── SMALL TREAD MARK LINES (vertical ticks) ───────── */}
+          {[120, 200, 300, 400, 500].map((y, i) => (
             <line
               key={y}
-              x1="15"
+              x1="55"
               y1={y}
-              x2="265"
-              y2={y}
+              x2="65"
+              y2={y - 10}
               stroke="#00d47a"
-              strokeWidth={i === 2 ? 1.2 : 0.6}
-              opacity={i === 2 ? 0.35 : 0.12}
-              strokeDasharray={i === 2 ? "none" : "4 6"}
+              strokeWidth="1.5"
+              opacity="0.5"
+              strokeLinecap="round"
             />
           ))}
 
-          {/* Center crosshair */}
-          <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
-            <animate attributeName="opacity" values="0.2;0.9;0.2" dur="2s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="140" cy="315" r="3" fill="#00d47a" opacity="0.5">
-            <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite" />
-          </circle>
-          <line x1="122" y1="315" x2="158" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
-          <line x1="140" y1="297" x2="140" y2="333" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
-
-          {/* Tick marks on sides */}
-          {[126, 210, 315, 420, 504].map((y, i) => (
-            <g key={`tick-${y}`}>
-              <line
-                x1="12"
-                y1={y}
-                x2={i === 2 ? 20 : 17}
-                y2={y}
-                stroke="#00d47a"
-                strokeWidth={i === 2 ? 2 : 1}
-                opacity="0.5"
-                strokeLinecap="round"
-              />
-              <line
-                x1="268"
-                y1={y}
-                x2={i === 2 ? 260 : 263}
-                y2={y}
-                stroke="#00d47a"
-                strokeWidth={i === 2 ? 2 : 1}
-                opacity="0.5"
-                strokeLinecap="round"
-              />
-            </g>
-          ))}
-
-          {/* Scanning beam */}
+          {/* ───────── SCANNING LINE (optional keep) ───────── */}
           {isRecording && (
             <line
-              x1="12"
+              x1="20"
               y1={scanPct * 6.3}
-              x2="268"
+              x2="260"
               y2={scanPct * 6.3}
               stroke="#00d47a"
-              strokeWidth="2.5"
-              opacity="0.85"
-              filter="url(#glow)"
-            >
-              <animate attributeName="opacity" values="0.3;0.95;0.3" dur="0.4s" repeatCount="indefinite" />
-            </line>
+              strokeWidth="2"
+              opacity="0.8"
+            />
           )}
-
-          {/* Animated dash border around the frame */}
-          <rect
-            x="8"
-            y="8"
-            width="264"
-            height="614"
-            rx="12"
-            fill="none"
-            stroke="rgba(0,212,122,0.25)"
-            strokeWidth="1"
-            strokeDasharray="8 6"
-            style={{ animation: 'dashMove 4s linear infinite' }}
-          />
         </svg>
 
         {/* Corner L-brackets - matching the curved aesthetic */}
