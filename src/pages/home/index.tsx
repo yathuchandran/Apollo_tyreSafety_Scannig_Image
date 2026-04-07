@@ -448,31 +448,35 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, padding: '0 32px', maxWidth: 360, width: '100%' }}>
 
       {/* Phone icon */}
-      <div style={{ position: 'relative', width: 120, height: 120 }}>
+      <div style={{ position: 'relative', width: 150, height: 150 }}>
         <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.15)', animation: 'spin 12s linear infinite' }} />
         <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', border: '1px dashed rgba(0,212,122,0.1)', animation: 'spin 8s linear infinite reverse' }} />
-        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,122,0.08) 0%, transparent 70%)' }} />
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="42" height="72" viewBox="0 0 42 72" fill="none">
-            <rect x="1" y="1" width="40" height="70" rx="7" fill="rgba(0,212,122,0.06)" stroke="rgba(0,212,122,0.6)" strokeWidth="1.5" />
-            <rect x="5" y="9" width="32" height="46" rx="3" fill="rgba(0,212,122,0.04)" stroke="rgba(0,212,122,0.2)" strokeWidth="1" />
-            <rect x="15" y="61" width="12" height="3" rx="1.5" fill="rgba(0,212,122,0.4)" />
-            <circle cx="21" cy="5" r="1.5" fill="rgba(0,212,122,0.3)" />
-            <line x1="5" y1="28" x2="37" y2="28" stroke="rgba(0,212,122,0.4)" strokeWidth="1" />
-            <line x1="5" y1="32" x2="37" y2="32" stroke="rgba(0,212,122,0.25)" strokeWidth="0.8" />
-            <line x1="5" y1="36" x2="37" y2="36" stroke="rgba(0,212,122,0.4)" strokeWidth="1" />
-            <line x1="5" y1="40" x2="37" y2="40" stroke="rgba(0,212,122,0.25)" strokeWidth="0.8" />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,122,0.1) 0%, transparent 70%)' }} />
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'phoneRotate 3s cubic-bezier(0.4,0,0.2,1) infinite',
+        }}>
+          <svg width="48" height="82" viewBox="0 0 48 82" fill="none">
+            <rect x="1" y="1" width="46" height="80" rx="8" fill="rgba(0,212,122,0.06)" stroke="rgba(0,212,122,0.6)" strokeWidth="1.5" />
+            <rect x="6" y="10" width="36" height="54" rx="3" fill="rgba(0,212,122,0.04)" stroke="rgba(0,212,122,0.2)" strokeWidth="1" />
+            <rect x="18" y="70" width="12" height="3" rx="1.5" fill="rgba(0,212,122,0.4)" />
+            <circle cx="24" cy="5.5" r="1.5" fill="rgba(0,212,122,0.3)" />
+            <line x1="6" y1="37" x2="42" y2="37" stroke="rgba(0,212,122,0.3)" strokeWidth="0.8" strokeDasharray="3 2" />
           </svg>
         </div>
+        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 150 150">
+          <path d="M 130 75 A 55 55 0 0 0 75 20" stroke="rgba(0,212,122,0.45)" strokeWidth="2" fill="none" strokeLinecap="round" strokeDasharray="8 4" style={{ animation: 'dashMove2 2s linear infinite' }} />
+          <polygon points="73,13 81,23 65,23" fill="rgba(0,212,122,0.65)" />
+        </svg>
       </div>
 
       {/* Text */}
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 600, margin: '0 0 10px', letterSpacing: '-0.5px' }}>
-          Ready to Scan
+          Rotate to Landscape
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-          Hold your phone in portrait mode and point the rear camera at the tyre tread surface.
+          Turn your phone sideways — the scanner captures the full tyre tread width in one pass.
         </p>
       </div>
 
@@ -524,6 +528,12 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
       @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+      @keyframes phoneRotate {
+        0%,25%  { transform: rotate(0deg); }
+        55%,85% { transform: rotate(-90deg); }
+        100%    { transform: rotate(0deg); }
+      }
+      @keyframes dashMove2 { to { stroke-dashoffset: -24; } }
     `}</style>
   </div>
 );
