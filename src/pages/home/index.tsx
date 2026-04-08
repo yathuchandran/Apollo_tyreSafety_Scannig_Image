@@ -11,16 +11,15 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
-// interface ExtendedMediaTrackConstraintSet extends MediaTrackConstraintSet {
-//   torch?: boolean;
-// }
-
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  const animationRef = useRef<number>();
+  const processingIntervalRef = useRef<number>();
 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -39,7 +38,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       
       trackRef.current = videoTrack;
       
-      // Check if flash/torch is supported
       const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
       const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
       
@@ -78,6 +76,49 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   };
 
+  // Process video frame and extract left side only
+  const processFrame = () => {
+    if (!videoRef.current || !canvasRef.current || !isRecording) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Calculate the left side crop area (about 45% from left)
+    const cropWidth = canvas.width * 0.45; // Left 45% of the frame
+    const cropHeight = canvas.height;
+    
+    // Draw only the left side portion
+    ctx.drawImage(
+      video, 
+      0, 0, cropWidth, cropHeight,  // Source rectangle (left side)
+      0, 0, canvas.width, canvas.height  // Destination (stretch to full frame)
+    );
+  };
+
+  // Start frame processing loop
+  const startFrameProcessing = () => {
+    if (processingIntervalRef.current) return;
+    
+    processingIntervalRef.current = setInterval(() => {
+      processFrame();
+    }, 33); // ~30fps
+  };
+
+  // Stop frame processing
+  const stopFrameProcessing = () => {
+    if (processingIntervalRef.current) {
+      clearInterval(processingIntervalRef.current);
+      processingIntervalRef.current = undefined;
+    }
+  };
+
   // Animate vertical scan line
   useEffect(() => {
     if (!isRecording) { setScanPct(0); return; }
@@ -107,7 +148,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           streamRef.current = stream;
           videoRef.current.onloadedmetadata = () => {
             setIsCameraReady(true);
-            // Turn on flash when camera is ready
             turnOnFlash(stream);
           };
         }
@@ -125,7 +165,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             streamRef.current = stream;
             videoRef.current.onloadedmetadata = () => {
               setIsCameraReady(true);
-              // Turn on flash when camera is ready
               turnOnFlash(stream);
             };
           }
@@ -137,35 +176,47 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
     startCamera();
     return () => {
-      // Turn off flash before cleanup
       turnOffFlash();
+      stopFrameProcessing();
       streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [onClose]);
 
   const startRecording = () => {
     if (!streamRef.current || isRecording || !isCameraReady) return;
     if (navigator.vibrate) navigator.vibrate(100);
+    
+    // Get the canvas stream instead of camera stream
+    if (!canvasRef.current) return;
+    
+    const canvasStream = canvasRef.current.captureStream(30);
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
-    const mr = new MediaRecorder(streamRef.current, { mimeType });
+    
+    const mr = new MediaRecorder(canvasStream, { mimeType });
     mediaRecorderRef.current = mr;
     chunksRef.current = [];
+    
     mr.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
+    
     mr.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
       setRecordingComplete(true);
       setTimeout(() => onCapture(URL.createObjectURL(blob)), 800);
     };
-    mr.start(1000); // Capture in 1-second chunks for better performance
+    
+    mr.start(1000);
     setIsRecording(true);
     setRecordingDuration(0);
     
-    // Track recording duration
+    // Start processing frames
+    startFrameProcessing();
+    
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
     }, 1000);
@@ -177,6 +228,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       clearInterval(durationIntervalRef.current);
       durationIntervalRef.current = null;
     }
+    stopFrameProcessing();
     mediaRecorderRef.current.stop();
     setIsRecording(false);
   };
@@ -187,7 +239,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate progress percentage (max 60 seconds for visual feedback)
   const progress = Math.min((recordingDuration / 60) * 100, 100);
 
   return (
@@ -205,6 +256,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       height: '100vh',
       width: '100vw',
     }}>
+      {/* Hidden canvas for processing */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
       {/* Flash indicator */}
       {flashSupported && isCameraReady && !isRecording && (
         <div style={{
@@ -288,6 +342,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         pointerEvents: 'none',
         zIndex: 5,
       }} />
+      
       {/* Bottom gradient */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 120,
@@ -296,7 +351,35 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         zIndex: 5,
       }} />
 
-      {/* ══ CURVED SCAN FRAME (no corner L-bracket arrows) ══ */}
+      {/* Left Side Recording Zone Indicator */}
+      <div style={{
+        position: 'absolute',
+        left: 0,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        width: '45%',
+        height: '80%',
+        borderRight: '2px solid #00d47a',
+        background: 'linear-gradient(90deg, rgba(0,212,122,0.05) 0%, rgba(0,212,122,0) 100%)',
+        pointerEvents: 'none',
+        zIndex: 12,
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%) rotate(-90deg)',
+          whiteSpace: 'nowrap',
+          color: 'rgba(0,212,122,0.4)',
+          fontSize: 10,
+          letterSpacing: '4px',
+          textTransform: 'uppercase',
+        }}>
+          RECORDING ZONE
+        </div>
+      </div>
+
+      {/* ══ CURVED SCAN FRAME ══ */}
       <div style={{
         position: 'absolute',
         left: '50%',
@@ -307,7 +390,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         pointerEvents: 'none',
         zIndex: 15,
       }}>
-        {/* Curved frame SVG — corner L-brackets removed */}
         <svg
           viewBox="0 0 280 630"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
@@ -327,10 +409,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </filter>
           </defs>
 
-          {/* Background tint */}
           <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
 
-          {/* Secondary curved lines (inner glow lines) */}
+          {/* Secondary curved lines */}
           <path
             d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
             fill="none"
@@ -466,12 +547,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             color: '#00d47a', fontSize: 10, fontWeight: 600,
             letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace',
           }}>
-            {isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'}
+            {isRecording ? 'RECORDING LEFT ZONE' : 'ALIGN LEFT SIDE TREAD'}
           </span>
         </div>
       </div>
 
-      {/* ══ LEFT SIDE TYRE CURVED EDGE (LANDSCAPE) ══ */}
+      {/* ══ LEFT SIDE TYRE CURVED EDGE (RECORDING BOUNDARY) ══ */}
       <div style={{
         position: 'absolute',
         left: 0,
@@ -506,7 +587,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </filter>
           </defs>
 
-          {/* MAIN TYRE EDGE (STRAIGHT + CURVED ENDS) */}
           <path
             d="M 50 10 Q 25 30 40 70 L 40 230 Q 25 270 50 290"
             fill="none"
@@ -516,7 +596,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             filter="url(#softGlow)"
           />
 
-          {/* INNER PARALLEL EDGE */}
           <path
             d="M 70 20 Q 50 40 60 80 L 60 220 Q 50 260 70 280"
             fill="none"
@@ -526,7 +605,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             strokeLinecap="round"
           />
 
-          {/* ROUGH EDGE DETAIL */}
           <path
             d="M 45 15 Q 20 35 35 75 L 35 235 Q 20 265 45 295"
             fill="none"
@@ -537,7 +615,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             strokeLinecap="round"
           />
 
-          {/* SMALL TREAD TICKS */}
           {[60, 100, 140, 180, 220].map((y) => (
             <line
               key={y}
@@ -552,7 +629,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             />
           ))}
 
-          {/* SCAN LINE */}
           {isRecording && (
             <line
               x1="0"
@@ -630,7 +706,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                   }} />
                 ))}
               </div>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Hold steady · Cover full tread</span>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Left zone only · Right side unlimited</span>
             </div>
           </div>
         )}
@@ -647,7 +723,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               }} />
             </div>
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-              Recording: {formatDuration(recordingDuration)}
+              Recording left zone: {formatDuration(recordingDuration)}
             </span>
           </div>
         )}
@@ -659,7 +735,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
           }}>
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>6:7 · HD</span>
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>LEFT ZONE REC</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -715,7 +791,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               fontSize: 10, letterSpacing: '0.08em',
               animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
             }}>
-              {isRecording ? '● STOP' : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
+              {isRecording ? '● STOP' : isCameraReady ? 'TAP TO SCAN LEFT ZONE' : 'LOADING...'}
             </span>
           </div>
 
@@ -745,8 +821,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               </svg>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing video…</p>
+              <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Left Zone Recorded</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing left side tread video…</p>
             </div>
           </div>
         </div>
@@ -813,7 +889,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 
     <div style={{ position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}>
       <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, letterSpacing: '0.35em', textTransform: 'uppercase', fontWeight: 500, whiteSpace: 'nowrap' }}>
-        APOLLO · TREAD SCAN
+        APOLLO · LEFT ZONE SCAN
       </span>
     </div>
 
@@ -852,18 +928,18 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
-          Manual Video Capture
+          Left Zone Recording Only
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          You control when recording stops — scan the full tyre width at your own pace
+          Only the left side (marked in green) will be recorded. Right side is unlimited and won't be captured.
         </p>
       </div>
 
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '◎', label: 'Point rear camera at the tread' },
-          { icon: '▭', label: 'Align tread inside the green frame' },
-          { icon: '●', label: 'Tap scan to start, tap stop when finished' },
+          { icon: '◀', label: 'Left green zone = recording area' },
+          { icon: '▶', label: 'Right side = unlimited, not recorded' },
+          { icon: '●', label: 'Tap scan to start recording left zone' },
         ].map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -898,7 +974,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" />
         </svg>
-        Open Scanner
+        Open Scanner (Left Zone Only)
       </button>
     </div>
 
@@ -954,10 +1030,10 @@ const Home: React.FC = () => {
             <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase' }}>APOLLO SYSTEM</span>
           </div>
           <h1 style={{ fontSize: 40, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-1.5px', lineHeight: 1.1 }}>
-            Tread<span style={{ color: '#00d47a' }}>Scan</span>
+            Left<span style={{ color: '#00d47a' }}>Zone</span>
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-            AI-powered tyre tread depth analysis
+            Record only the left side of the tyre tread
           </p>
         </div>
 
@@ -985,10 +1061,10 @@ const Home: React.FC = () => {
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, letterSpacing: '0.25em', margin: '0 0 8px', textTransform: 'uppercase' }}>Tap to begin</p>
-              <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Tyre Scan</h2>
-              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Manual recording control</p>
+              <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Left Zone Scan</h2>
+              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Only left side will be recorded</p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {['Manual control', 'HD capture', 'Full tread'].map(f => (
+                {['Left zone only', 'Right unlimited', 'Manual control'].map(f => (
                   <span key={f} style={{
                     padding: '4px 12px', borderRadius: 20,
                     background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)',
@@ -1002,7 +1078,7 @@ const Home: React.FC = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 28 }}>
           {[
-            { value: '±0.1', unit: 'mm', label: 'Accuracy' },
+            { value: 'Left', unit: '', label: 'Zone' },
             { value: 'Manual', unit: '', label: 'Control' },
             { value: '4K', unit: '', label: 'Resolution' },
           ].map(s => (
@@ -1029,8 +1105,8 @@ const Home: React.FC = () => {
               <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 12, marginBottom: 10 }}>
                 <video src={url} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Captured</span>
+                  <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Left Zone #{capturedVideos.length - i}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Left Only</span>
                 </div>
               </div>
             ))}
@@ -1040,9 +1116,9 @@ const Home: React.FC = () => {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20 }}>
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
           {([
-            ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
-            ['Hold phone in portrait mode', 'Point rear camera at the tyre tread'],
-            ['Align tread in green frame', 'Centre the tyre in the scan zone'],
+            ['Tap "Start Left Zone Scan"', 'Launches the guided camera scanner'],
+            ['Left green zone = recording area', 'Only this area will be captured on video'],
+            ['Right side is unlimited', 'Can be used for positioning, not recorded'],
             ['Tap scan to start, stop when done', 'You control the recording duration'],
           ] as [string, string][]).map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
