@@ -11,6 +11,10 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
+// interface ExtendedMediaTrackConstraintSet extends MediaTrackConstraintSet {
+//   torch?: boolean;
+// }
+
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -24,21 +28,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
-  
-  const durationIntervalRef = useRef<number|null>(null);
+
+  const durationIntervalRef = useRef<number | null>(null);
 
   // Function to turn on flash
   const turnOnFlash = async (stream: MediaStream) => {
     try {
       const videoTrack = stream.getVideoTracks()[0];
       if (!videoTrack) return;
-      
+
       trackRef.current = videoTrack;
-      
+
       // Check if flash/torch is supported
       const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
       const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
-      
+
       if (hasTorch) {
         setFlashSupported(true);
         await videoTrack.applyConstraints({
@@ -61,7 +65,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       if (trackRef.current) {
         const capabilities = trackRef.current.getCapabilities() as ExtendedMediaTrackCapabilities;
         const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
-        
+
         if (hasTorch) {
           await trackRef.current.applyConstraints({
             advanced: [{ torch: false }] as any
@@ -160,7 +164,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     mr.start(1000); // Capture in 1-second chunks for better performance
     setIsRecording(true);
     setRecordingDuration(0);
-    
+
     // Track recording duration
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
@@ -533,14 +537,91 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             strokeLinecap="round"
           />
 
-          {/* SMALL TREAD TICKS */}
-          {[60, 100, 140, 180, 220].map((y) => (
+          {/* RECORDING START MARKER - Left edge where recording begins */}
+          <line
+            x1="50"
+            y1="70"
+            x2="50"
+            y2="230"
+            stroke="#00d47a"
+            strokeWidth="3"
+            opacity="0.9"
+            strokeDasharray="8 4"
+            filter="url(#softGlow)"
+          >
+            {isRecording && (
+              <animate attributeName="opacity" values="0.5;1;0.5" dur="1s" repeatCount="indefinite" />
+            )}
+          </line>
+
+          {/* Recording start arrow pointing right */}
+          <polygon
+            points="55,145 70,135 70,155"
+            fill="#00d47a"
+            opacity="0.8"
+          >
+            {!isRecording && (
+              <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />
+            )}
+          </polygon>
+
+          {/* Recording direction arrow (rightward) */}
+          {isRecording && (
+            <>
+              <line
+                x1="70"
+                y1="145"
+                x2="250"
+                y2="145"
+                stroke="#00d47a"
+                strokeWidth="2"
+                opacity="0.4"
+                strokeDasharray="6 4"
+              >
+                <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
+              </line>
+              <polygon
+                points="250,140 265,145 250,150"
+                fill="#00d47a"
+                opacity="0.6"
+              >
+                <animate attributeName="opacity" values="0.3;0.8;0.3" dur="0.8s" repeatCount="indefinite" />
+              </polygon>
+            </>
+          )}
+
+          {/* START HERE label */}
+          <text
+            x="40"
+            y="140"
+            fill="#00d47a"
+            fontSize="9"
+            fontWeight="700"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
+          >
+            START
+          </text>
+          <text
+            x="40"
+            y="152"
+            fill="#00d47a"
+            fontSize="7"
+            fontWeight="600"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace' }}
+          >
+            HERE →
+          </text>
+
+          {/* SMALL TREAD TICKS - Starting from left edge */}
+          {[80, 110, 140, 170, 200, 230].map((y) => (
             <line
               key={y}
-              x1="70"
+              x1="55"
               y1={y}
-              x2="85"
-              y2={y - 10}
+              x2="70"
+              y2={y - 8}
               stroke="#00d47a"
               strokeWidth="1.5"
               opacity="0.6"
@@ -548,33 +629,45 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             />
           ))}
 
-          {/* SCAN LINE */}
+          {/* SCAN LINE - Moves across full width from left to right */}
           {isRecording && (
             <line
-              x1="0"
-              y1={scanPct * 3}
-              x2="300"
-              y2={scanPct * 3}
+              x1={50 + (scanPct * 2.2)}
+              y1="70"
+              x2={50 + (scanPct * 2.2)}
+              y2="230"
               stroke="#00d47a"
               strokeWidth="2"
-              opacity="0.8"
-            />
+              opacity="0.7"
+              filter="url(#softGlow)"
+            >
+              <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.4s" repeatCount="indefinite" />
+            </line>
           )}
+
+          {/* Right side unlimited indicator */}
+          <text
+            x="270"
+            y="145"
+            fill="rgba(255,255,255,0.15)"
+            fontSize="7"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace' }}
+          >
+            UNLIMITED
+          </text>
+          <text
+            x="270"
+            y="157"
+            fill="rgba(255,255,255,0.1)"
+            fontSize="6"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace' }}
+          >
+            COVERAGE →
+          </text>
         </svg>
       </div>
-
-      {/* ══ CROP OVERLAY (MASKS RIGHT SIDE, LEAVES ONLY LEFT SIDE OF FRAME) ══ */}
-      {/* This overlay blocks out everything to the right of the tyre edge, ensuring video only captures the left side */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: '60%', // Covers from the middle to the right edge
-        background: '#000',
-        zIndex: 14,
-        pointerEvents: 'none',
-      }} />
 
       {/* ══ TOP BAR ══ */}
       <div style={{
