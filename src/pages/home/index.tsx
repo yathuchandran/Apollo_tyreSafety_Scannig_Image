@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
-// ─── TYRE TREAD SELECTIVE RECORDER ──────────────────────────────────────────
-// This component records video by cropping to the tread frame overlay using canvas capture
-
-interface TyreTreadRecorderProps {
-  onCapture: (trimmedVideoBlob: Blob, originalBlob: Blob, trimRange: { start: number; end: number }) => void;
+// ─── CAMERA CAPTURE ──────────────────────────────────────────────────────────
+interface CameraCaptureProps {
+  onCapture: (videoUrl: string) => void;
   onClose: () => void;
 }
 
@@ -13,13 +11,13 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
-const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClose }) => {
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(document.createElement('canvas'));
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
@@ -29,134 +27,53 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
 
-  // Track when tread is properly aligned within the frame
-  const [isTreadAligned, setIsTreadAligned] = useState<boolean>(false);
-  const [alignmentConfidence, setAlignmentConfidence] = useState<number>(0);
-  const alignmentCheckRef = useRef<number | null>(null);
-
   const durationIntervalRef = useRef<number | null>(null);
-  const canvasStreamRef = useRef<MediaStream | null>(null);
 
-  // Crop dimensions - matching the green frame overlay with extra left margin
-  const getCropDimensions = useCallback(() => {
-    if (!videoRef.current) return null;
-    
-    const video = videoRef.current;
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-    
-    // The green frame has aspect ratio ~3.7/7 (approx 0.528)
-    const targetAspectRatio = 3.7 / 7; // ~0.528
-    const frameHeight = videoHeight * 0.7; // Frame takes ~70% of video height
-    let frameWidth = frameHeight * targetAspectRatio;
-    
-    // Calculate centered position
-    let startX = (videoWidth - frameWidth) / 2;
-    const startY = (videoHeight - frameHeight) / 2;
-    
-    // SHIFT CROP MORE TO THE LEFT - move startX left by 15% of frame width
-    const leftShift = frameWidth * 0.15;
-    startX = Math.max(0, startX - leftShift);
-    
-    // Adjust width to maintain aspect ratio or expand to the right
-    // Expand width slightly to compensate for left shift
-    frameWidth = Math.min(frameWidth * 1.1, videoWidth - startX);
-    
-    return {
-      startX: Math.max(0, startX),
-      startY: Math.max(0, startY),
-      width: Math.min(frameWidth, videoWidth - startX),
-      height: Math.min(frameHeight, videoHeight - startY),
-    };
-  }, []);
+  // Function to turn on flash
+  const turnOnFlash = async (stream: MediaStream) => {
+    try {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) return;
 
-  // Draw cropped frame to canvas
-  const drawToCanvas = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    
-    if (!ctx || video.readyState !== 4) return;
-    
-    const crop = getCropDimensions();
-    if (!crop) return;
-    
-    // Ensure canvas size matches crop dimensions
-    if (canvas.width !== crop.width || canvas.height !== crop.height) {
-      canvas.width = crop.width;
-      canvas.height = crop.height;
-    }
-    
-    // Draw the cropped portion of the video onto the canvas
-    ctx.drawImage(
-      video,
-      crop.startX, crop.startY, crop.width, crop.height,
-      0, 0, crop.width, crop.height
-    );
-  }, [getCropDimensions]);
+      trackRef.current = videoTrack;
 
-  // Animation loop for canvas drawing
-  const startCanvasDrawLoop = useCallback(() => {
-    const drawLoop = () => {
-      drawToCanvas();
-      animationFrameRef.current = requestAnimationFrame(drawLoop);
-    };
-    drawLoop();
-  }, [drawToCanvas]);
+      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+      const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
 
-  const stopCanvasDrawLoop = useCallback(() => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-  }, []);
-
-  // Simulate tread alignment detection
-  const simulateTreadAlignment = useCallback(() => {
-    if (!isRecording) {
-      setIsTreadAligned(false);
-      setAlignmentConfidence(0);
-      return;
-    }
-
-    const timeSinceStart = recordingDuration;
-    let confidence = 0;
-    
-    if (timeSinceStart < 1.5) {
-      confidence = Math.min(0.3 + (timeSinceStart * 0.2), 0.6);
-    } else if (timeSinceStart >= 1.5 && timeSinceStart < 8) {
-      confidence = 0.85 + (Math.sin(timeSinceStart * 2) * 0.08);
-    } else if (timeSinceStart >= 8) {
-      confidence = Math.max(0.7 - ((timeSinceStart - 8) * 0.1), 0.3);
-    }
-    
-    confidence = Math.min(0.95, Math.max(0, confidence));
-    setAlignmentConfidence(confidence);
-    
-    const nowAligned = confidence > 0.65;
-    
-    if (nowAligned !== isTreadAligned) {
-      setIsTreadAligned(nowAligned);
-      
-      if (nowAligned && !canvasStreamRef.current) {
-        console.log(`Tread aligned at ${recordingDuration}s - recording`);
+      if (hasTorch) {
+        setFlashSupported(true);
+        await videoTrack.applyConstraints({
+          advanced: [{ torch: true }] as any
+        });
+        console.log('Flash turned on');
+      } else {
+        console.log('Flash not supported on this device');
+        setFlashSupported(false);
       }
+    } catch (error) {
+      console.error('Failed to turn on flash:', error);
+      setFlashSupported(false);
     }
-  }, [isRecording, recordingDuration, isTreadAligned]);
+  };
 
-  // Run alignment simulation during recording
-  useEffect(() => {
-    if (isRecording) {
-      alignmentCheckRef.current = setInterval(simulateTreadAlignment, 100);
-    } else {
-      if (alignmentCheckRef.current) clearInterval(alignmentCheckRef.current);
+  // Function to turn off flash
+  const turnOffFlash = async () => {
+    try {
+      if (trackRef.current) {
+        const capabilities = trackRef.current.getCapabilities() as ExtendedMediaTrackCapabilities;
+        const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
+
+        if (hasTorch) {
+          await trackRef.current.applyConstraints({
+            advanced: [{ torch: false }] as any
+          });
+          console.log('Flash turned off');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to turn off flash:', error);
     }
-    return () => {
-      if (alignmentCheckRef.current) clearInterval(alignmentCheckRef.current);
-    };
-  }, [isRecording, simulateTreadAlignment]);
+  };
 
   // Animate vertical scan line
   useEffect(() => {
@@ -171,42 +88,67 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
     return () => clearInterval(id);
   }, [isRecording]);
 
-  // Function to turn on flash
-  const turnOnFlash = async (stream: MediaStream) => {
-    try {
-      const videoTrack = stream.getVideoTracks()[0];
-      if (!videoTrack) return;
-      trackRef.current = videoTrack;
-      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
-      const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
-      if (hasTorch) {
-        setFlashSupported(true);
-        await videoTrack.applyConstraints({
-          advanced: [{ torch: true }] as any
-        });
-      } else {
-        setFlashSupported(false);
-      }
-    } catch (error) {
-      setFlashSupported(false);
+  // Draw cropped frame to canvas for selective recording
+  const drawToCanvas = () => {
+    if (!canvasRef.current || !videoRef.current || !isRecording) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    
+    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
+      animationFrameRef.current = requestAnimationFrame(drawToCanvas);
+      return;
     }
+
+    // Calculate crop dimensions matching the green frame (aspect ratio 3.7 / 7 ≈ 0.528)
+    const targetAspectRatio = 3.7 / 7; // ~0.528 (width/height)
+    const videoAspectRatio = video.videoWidth / video.videoHeight;
+    
+    let cropWidth, cropHeight, startX, startY;
+    
+    if (videoAspectRatio > targetAspectRatio) {
+      // Video is wider, crop width to match aspect ratio
+      cropHeight = video.videoHeight;
+      cropWidth = cropHeight * targetAspectRatio;
+      startX = (video.videoWidth - cropWidth) / 2;
+      startY = 0;
+    } else {
+      // Video is taller, crop height to match aspect ratio
+      cropWidth = video.videoWidth;
+      cropHeight = cropWidth / targetAspectRatio;
+      startX = 0;
+      startY = (video.videoHeight - cropHeight) / 2;
+    }
+    
+    // Set canvas dimensions to match cropped area
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
+    
+    // Draw the cropped portion to canvas
+    ctx.drawImage(
+      video,
+      startX, startY, cropWidth, cropHeight,
+      0, 0, cropWidth, cropHeight
+    );
+    
+    // Continue the animation loop
+    animationFrameRef.current = requestAnimationFrame(drawToCanvas);
   };
 
-  const turnOffFlash = async () => {
-    try {
-      if (trackRef.current) {
-        const capabilities = trackRef.current.getCapabilities() as ExtendedMediaTrackCapabilities;
-        const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
-        if (hasTorch) {
-          await trackRef.current.applyConstraints({
-            advanced: [{ torch: false }] as any
-          });
-        }
+  // Start canvas drawing when recording begins
+  useEffect(() => {
+    if (isRecording && videoRef.current) {
+      drawToCanvas();
+    }
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
-    } catch (error) {}
-  };
+    };
+  }, [isRecording]);
 
-  // Camera initialization
   useEffect(() => {
     const startCamera = async () => {
       try {
@@ -224,7 +166,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
           videoRef.current.onloadedmetadata = () => {
             setIsCameraReady(true);
             turnOnFlash(stream);
-            startCanvasDrawLoop();
           };
         }
       } catch {
@@ -242,7 +183,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             videoRef.current.onloadedmetadata = () => {
               setIsCameraReady(true);
               turnOnFlash(stream);
-              startCanvasDrawLoop();
             };
           }
         } catch {
@@ -252,63 +192,49 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
       }
     };
     startCamera();
+    
+    // Create hidden canvas for selective recording
+    canvasRef.current = document.createElement('canvas');
+    canvasRef.current.style.display = 'none';
+    document.body.appendChild(canvasRef.current);
+    
     return () => {
       turnOffFlash();
-      stopCanvasDrawLoop();
-      if (canvasStreamRef.current) {
-        canvasStreamRef.current.getTracks().forEach(t => t.stop());
-      }
       streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (canvasRef.current) document.body.removeChild(canvasRef.current);
     };
-  }, [onClose, startCanvasDrawLoop, stopCanvasDrawLoop]);
+  }, [onClose]);
 
   const startRecording = () => {
-    if (!isCameraReady || isRecording) return;
+    if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current) return;
     if (navigator.vibrate) navigator.vibrate(100);
     
-    setIsTreadAligned(false);
-    setAlignmentConfidence(0);
-    chunksRef.current = [];
-    
-    const canvas = canvasRef.current;
-    const crop = getCropDimensions();
-    if (crop) {
-      canvas.width = crop.width;
-      canvas.height = crop.height;
-    }
-    
-    const canvasStream = canvas.captureStream(30);
-    canvasStreamRef.current = canvasStream;
+    // Get canvas stream for selective recording
+    const canvasStream = canvasRef.current.captureStream(30);
     
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
-    
     const mr = new MediaRecorder(canvasStream, { mimeType });
     mediaRecorderRef.current = mr;
+    chunksRef.current = [];
     
     mr.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     
     mr.onstop = () => {
-      const treadOnlyBlob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
       setRecordingComplete(true);
-      
-      setTimeout(() => {
-        onCapture(
-          treadOnlyBlob,
-          treadOnlyBlob,
-          { start: 0, end: recordingDuration }
-        );
-      }, 500);
+      setTimeout(() => onCapture(URL.createObjectURL(blob)), 800);
     };
     
     mr.start(1000);
     setIsRecording(true);
     setRecordingDuration(0);
-    
+
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
     }, 1000);
@@ -321,10 +247,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
       durationIntervalRef.current = null;
     }
     mediaRecorderRef.current.stop();
-    if (canvasStreamRef.current) {
-      canvasStreamRef.current.getTracks().forEach(t => t.stop());
-      canvasStreamRef.current = null;
-    }
     setIsRecording(false);
   };
 
@@ -335,9 +257,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
   };
 
   const progress = Math.min((recordingDuration / 60) * 100, 100);
-  
-  const alignmentColor = isTreadAligned ? '#00d47a' : 
-    (alignmentConfidence > 0.4 ? '#d4a000' : '#ef4444');
 
   return (
     <div style={{
@@ -354,9 +273,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
       height: '100vh',
       width: '100vw',
     }}>
-      {/* Hidden canvas for recording */}
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
-
       {/* Flash indicator */}
       {flashSupported && isCameraReady && !isRecording && (
         <div style={{
@@ -382,7 +298,12 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             boxShadow: '0 0 8px #FFD700',
             animation: 'pulse 1.5s ease-in-out infinite',
           }} />
-          <span style={{ color: '#FFD700', fontSize: 10, fontWeight: 500 }}>FLASH ON</span>
+          <span style={{
+            color: '#FFD700',
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: '0.5px',
+          }}>FLASH ON</span>
         </div>
       )}
 
@@ -428,51 +349,22 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
         background: 'radial-gradient(ellipse 90% 130% at 50% 50%, transparent 30%, rgba(0,0,0,0.65) 100%)',
       }} />
 
-      {/* Top & Bottom gradients */}
+      {/* Top gradient */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: 100,
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.82), transparent)',
-        pointerEvents: 'none', zIndex: 5,
+        pointerEvents: 'none',
+        zIndex: 5,
       }} />
+      {/* Bottom gradient */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 120,
         background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
-        pointerEvents: 'none', zIndex: 5,
+        pointerEvents: 'none',
+        zIndex: 5,
       }} />
 
-      {/* Alignment Status Badge */}
-      {isRecording && (
-        <div style={{
-          position: 'absolute',
-          top: 100,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 20,
-          background: `rgba(0,0,0,0.7)`,
-          backdropFilter: 'blur(8px)',
-          padding: '6px 16px',
-          borderRadius: 40,
-          border: `1px solid ${alignmentColor}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <div style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: alignmentColor,
-            boxShadow: `0 0 8px ${alignmentColor}`,
-            animation: isTreadAligned ? 'pulse 0.8s ease-in-out infinite' : 'none',
-          }} />
-          <span style={{ color: alignmentColor, fontSize: 11, fontWeight: 600, letterSpacing: '0.5px' }}>
-            {isTreadAligned ? '✓ TREAD ALIGNED - RECORDING' : 
-             (alignmentConfidence > 0.4 ? '⟳ CENTERING TREAD...' : '✗ ALIGN TREAD IN FRAME')}
-          </span>
-        </div>
-      )}
-
-      {/* ══ CURVED SCAN FRAME (tyre tread alignment zone) ══ */}
+      {/* ══ CURVED SCAN FRAME ══ */}
       <div style={{
         position: 'absolute',
         left: '50%',
@@ -504,21 +396,39 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
 
           <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
 
-          {/* Frame border */}
-          <rect
-            x="8"
-            y="8"
-            width="264"
-            height="614"
-            rx="12"
+          <path
+            d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
             fill="none"
-            stroke={isRecording ? (isTreadAligned ? "#00d47a" : "rgba(212,160,0,0.6)") : "rgba(0,212,122,0.25)"}
-            strokeWidth={isTreadAligned && isRecording ? "2" : "1.5"}
-            strokeDasharray="8 6"
-            style={{ animation: isTreadAligned && isRecording ? 'dashMove 2s linear infinite, framePulse 1s ease-in-out infinite' : 'dashMove 4s linear infinite' }}
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 252 18 L 222 18 Q 218 18 218 22 L 218 48"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 28 612 L 58 612 Q 62 612 62 608 L 62 582"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 252 612 L 222 612 Q 218 612 218 608 L 218 582"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.35"
+            strokeWidth="1.2"
+            strokeLinecap="round"
           />
 
-          {/* Horizontal guide lines */}
           {[126, 210, 315, 420, 504].map((y, i) => (
             <line
               key={y}
@@ -528,23 +438,46 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
               y2={y}
               stroke="#00d47a"
               strokeWidth={i === 2 ? 1.2 : 0.6}
-              opacity={i === 2 ? (isTreadAligned ? 0.5 : 0.35) : (isTreadAligned ? 0.2 : 0.12)}
+              opacity={i === 2 ? 0.35 : 0.12}
               strokeDasharray={i === 2 ? "none" : "4 6"}
             />
           ))}
 
-          {/* Center crosshair */}
           <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
-            {isTreadAligned && isRecording && (
-              <animate attributeName="opacity" values="0.2;0.9;0.2" dur="1s" repeatCount="indefinite" />
-            )}
+            <animate attributeName="opacity" values="0.2;0.9;0.2" dur="2s" repeatCount="indefinite" />
           </circle>
-          <circle cx="140" cy="315" r="3" fill={isTreadAligned && isRecording ? '#00d47a' : 'rgba(0,212,122,0.5)'} opacity="0.5">
-            <animate attributeName="r" values={isTreadAligned && isRecording ? "2;5;2" : "2;4;2"} dur="1.5s" repeatCount="indefinite" />
+          <circle cx="140" cy="315" r="3" fill="#00d47a" opacity="0.5">
+            <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite" />
           </circle>
+          <line x1="122" y1="315" x2="158" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
+          <line x1="140" y1="297" x2="140" y2="333" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
 
-          {/* Scanning beam */}
-          {isRecording && isTreadAligned && (
+          {[126, 210, 315, 420, 504].map((y, i) => (
+            <g key={`tick-${y}`}>
+              <line
+                x1="12"
+                y1={y}
+                x2={i === 2 ? 20 : 17}
+                y2={y}
+                stroke="#00d47a"
+                strokeWidth={i === 2 ? 2 : 1}
+                opacity="0.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="268"
+                y1={y}
+                x2={i === 2 ? 260 : 263}
+                y2={y}
+                stroke="#00d47a"
+                strokeWidth={i === 2 ? 2 : 1}
+                opacity="0.5"
+                strokeLinecap="round"
+              />
+            </g>
+          ))}
+
+          {isRecording && (
             <line
               x1="12"
               y1={scanPct * 6.3}
@@ -559,24 +492,20 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             </line>
           )}
 
-          {/* Recording indicator */}
-          {isRecording && isTreadAligned && (
-            <text
-              x="140"
-              y="600"
-              textAnchor="middle"
-              fill="#00d47a"
-              fontSize="10"
-              fontWeight="bold"
-              opacity="0.8"
-              style={{ fontFamily: 'monospace' }}
-            >
-              ● RECORDING TREAD
-            </text>
-          )}
+          <rect
+            x="8"
+            y="8"
+            width="264"
+            height="614"
+            rx="12"
+            fill="none"
+            stroke="rgba(0,212,122,0.25)"
+            strokeWidth="1"
+            strokeDasharray="8 6"
+            style={{ animation: 'dashMove 4s linear infinite' }}
+          />
         </svg>
 
-        {/* Frame label */}
         <div style={{
           position: 'absolute', top: -32, left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
@@ -584,25 +513,24 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
           backdropFilter: 'blur(4px)',
           padding: '4px 12px',
           borderRadius: 20,
-          border: `1px solid ${isRecording ? (isTreadAligned ? 'rgba(0,212,122,0.6)' : 'rgba(212,160,0,0.4)') : 'rgba(0,212,122,0.3)'}`,
+          border: '1px solid rgba(0,212,122,0.3)',
         }}>
           <div style={{
             width: 7, height: 7, borderRadius: '50%',
-            background: isRecording ? (isTreadAligned ? '#00d47a' : '#d4a000') : '#00d47a',
-            boxShadow: `0 0 6px ${isRecording ? (isTreadAligned ? '#00d47a' : '#d4a000') : '#00d47a'}`,
-            animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
+            background: isRecording ? '#ef4444' : '#00d47a',
+            boxShadow: `0 0 6px ${isRecording ? '#ef4444' : '#00d47a'}`,
+            animation: 'blink 1s ease-in-out infinite',
           }} />
           <span style={{
-            color: isRecording ? (isTreadAligned ? '#00d47a' : '#d4a000') : '#00d47a',
-            fontSize: 10, fontWeight: 600,
+            color: '#00d47a', fontSize: 10, fontWeight: 600,
             letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace',
           }}>
-            {isRecording ? (isTreadAligned ? 'SCANNING TREAD' : 'ALIGN TYRE TREAD') : 'ALIGN TYRE TREAD'}
+            {isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'}
           </span>
         </div>
       </div>
 
-      {/* ══ LEFT SIDE TYRE CURVED EDGE GUIDE ══ */}
+      {/* ══ LEFT SIDE TYRE CURVED EDGE ══ */}
       <div style={{
         position: 'absolute',
         left: 0,
@@ -613,7 +541,16 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
         pointerEvents: 'none',
         zIndex: 15,
       }}>
-        <svg viewBox="0 0 300 300" style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: '100%' }}>
+        <svg
+          viewBox="0 0 300 300"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            height: '100%',
+            width: '100%',
+          }}
+        >
           <defs>
             <linearGradient id="tyreGlow" x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
@@ -646,11 +583,138 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             strokeLinecap="round"
           />
 
-          <text x="40" y="140" fill="#00d47a" fontSize="9" fontWeight="700" textAnchor="end" style={{ fontFamily: 'monospace', letterSpacing: '1px' }}>START</text>
-          <text x="40" y="152" fill="#00d47a" fontSize="7" fontWeight="600" textAnchor="end" style={{ fontFamily: 'monospace' }}>HERE →</text>
+          <path
+            d="M 45 15 Q 20 35 35 75 L 35 235 Q 20 265 45 295"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.25"
+            strokeWidth="1.2"
+            strokeDasharray="5 6"
+            strokeLinecap="round"
+          />
 
-          <text x="270" y="145" fill="rgba(255,255,255,0.15)" fontSize="7" textAnchor="end" style={{ fontFamily: 'monospace' }}>UNLIMITED</text>
-          <text x="270" y="157" fill="rgba(255,255,255,0.1)" fontSize="6" textAnchor="end" style={{ fontFamily: 'monospace' }}>COVERAGE →</text>
+          <line
+            x1="50"
+            y1="70"
+            x2="50"
+            y2="230"
+            stroke="#00d47a"
+            strokeWidth="3"
+            opacity="0.9"
+            strokeDasharray="8 4"
+            filter="url(#softGlow)"
+          >
+            {isRecording && (
+              <animate attributeName="opacity" values="0.5;1;0.5" dur="1s" repeatCount="indefinite" />
+            )}
+          </line>
+
+          <polygon
+            points="55,145 70,135 70,155"
+            fill="#00d47a"
+            opacity="0.8"
+          >
+            {!isRecording && (
+              <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />
+            )}
+          </polygon>
+
+          {isRecording && (
+            <>
+              <line
+                x1="70"
+                y1="145"
+                x2="250"
+                y2="145"
+                stroke="#00d47a"
+                strokeWidth="2"
+                opacity="0.4"
+                strokeDasharray="6 4"
+              >
+                <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
+              </line>
+              <polygon
+                points="250,140 265,145 250,150"
+                fill="#00d47a"
+                opacity="0.6"
+              >
+                <animate attributeName="opacity" values="0.3;0.8;0.3" dur="0.8s" repeatCount="indefinite" />
+              </polygon>
+            </>
+          )}
+
+          <text
+            x="40"
+            y="140"
+            fill="#00d47a"
+            fontSize="9"
+            fontWeight="700"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
+          >
+            START
+          </text>
+          <text
+            x="40"
+            y="152"
+            fill="#00d47a"
+            fontSize="7"
+            fontWeight="600"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace' }}
+          >
+            HERE →
+          </text>
+
+          {[80, 110, 140, 170, 200, 230].map((y) => (
+            <line
+              key={y}
+              x1="55"
+              y1={y}
+              x2="70"
+              y2={y - 8}
+              stroke="#00d47a"
+              strokeWidth="1.5"
+              opacity="0.6"
+              strokeLinecap="round"
+            />
+          ))}
+
+          {isRecording && (
+            <line
+              x1={50 + (scanPct * 2.2)}
+              y1="70"
+              x2={50 + (scanPct * 2.2)}
+              y2="230"
+              stroke="#00d47a"
+              strokeWidth="2"
+              opacity="0.7"
+              filter="url(#softGlow)"
+            >
+              <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.4s" repeatCount="indefinite" />
+            </line>
+          )}
+
+          <text
+            x="270"
+            y="145"
+            fill="rgba(255,255,255,0.15)"
+            fontSize="7"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace' }}
+          >
+            UNLIMITED
+          </text>
+          <text
+            x="270"
+            y="157"
+            fill="rgba(255,255,255,0.1)"
+            fontSize="6"
+            textAnchor="end"
+            style={{ fontFamily: 'monospace' }}
+          >
+            COVERAGE →
+          </text>
         </svg>
       </div>
 
@@ -676,22 +740,22 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 7, height: 7, borderRadius: '50%',
-            background: isRecording ? (isTreadAligned ? '#00d47a' : '#d4a000') : '#00d47a',
-            boxShadow: isRecording ? `0 0 8px ${isTreadAligned ? 'rgba(0,212,122,0.9)' : 'rgba(212,160,0,0.9)'}` : '0 0 8px rgba(0,212,122,0.9)',
-            animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
+            background: isRecording ? '#ef4444' : '#00d47a',
+            boxShadow: isRecording ? '0 0 8px rgba(239,68,68,0.9)' : '0 0 8px rgba(0,212,122,0.9)',
+            animation: 'blink 1s ease-in-out infinite',
           }} />
           <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: '0.2em', fontFamily: 'monospace' }}>
-            {isRecording ? (isTreadAligned ? 'RECORDING' : 'ALIGNING') : 'APOLLO'}
+            {isRecording ? 'REC' : 'APOLLO'}
           </span>
         </div>
 
         <div style={{
           padding: '6px 14px', borderRadius: 20,
-          background: isRecording ? 'rgba(0,212,122,0.12)' : 'rgba(255,255,255,0.08)',
-          border: `1px solid ${isRecording ? 'rgba(0,212,122,0.4)' : 'rgba(255,255,255,0.15)'}`,
+          background: isRecording ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.08)',
+          border: `1px solid ${isRecording ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.15)'}`,
         }}>
           <span style={{
-            color: isRecording ? '#00d47a' : 'rgba(255,255,255,0.5)',
+            color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.5)',
             fontSize: 12, fontWeight: 600, fontFamily: 'monospace',
           }}>
             {isRecording ? formatDuration(recordingDuration) : '0:00'}
@@ -721,7 +785,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             </div>
           </div>
         )}
-        
         {isRecording && (
           <div style={{ width: '100%', maxWidth: 200 }}>
             <div style={{
@@ -734,14 +797,9 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
                 width: `${progress}%`, transition: 'width 1s linear',
               }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              <span style={{ color: isTreadAligned ? '#00d47a' : 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-                {isTreadAligned ? '● Recording tread' : '○ Align tread in frame'}
-              </span>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-                {formatDuration(recordingDuration)}
-              </span>
-            </div>
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+              Recording: {formatDuration(recordingDuration)}
+            </span>
           </div>
         )}
 
@@ -752,7 +810,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
           }}>
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>6:7 · HD</span>
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>CROP · HD</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -790,25 +848,25 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
               >
                 <div style={{
                   width: 64, height: 64, borderRadius: '50%',
-                  border: `2px solid ${isTreadAligned ? 'rgba(0,212,122,0.45)' : 'rgba(212,160,0,0.45)'}`,
+                  border: '2px solid rgba(239,68,68,0.45)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: `rgba(${isTreadAligned ? '0,212,122' : '212,160,0'},0.07)`,
+                  background: 'rgba(239,68,68,0.07)',
                 }}>
                   <div style={{
                     width: 44, height: 44,
                     borderRadius: 8,
-                    background: isTreadAligned ? '#00d47a' : '#d4a000',
-                    boxShadow: `0 0 20px ${isTreadAligned ? 'rgba(0,212,122,0.6)' : 'rgba(212,160,0,0.5)'}`,
+                    background: '#ef4444',
+                    boxShadow: '0 0 20px rgba(239,68,68,0.6)',
                   }} />
                 </div>
               </button>
             )}
             <span style={{
-              color: isRecording ? (isTreadAligned ? '#00d47a' : '#d4a000') : 'rgba(255,255,255,0.35)',
+              color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.35)',
               fontSize: 10, letterSpacing: '0.08em',
-              animation: isRecording && !isTreadAligned ? 'blink 1s ease-in-out infinite' : 'none',
+              animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
             }}>
-              {isRecording ? (isTreadAligned ? '● STOP SCAN' : '⟳ ALIGN FIRST') : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
+              {isRecording ? '● STOP' : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
             </span>
           </div>
 
@@ -839,7 +897,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Tread-only video saved</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing video…</p>
             </div>
           </div>
         </div>
@@ -857,10 +915,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
         @keyframes pulse {
           0%, 100% { opacity: 0.4; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.2); }
-        }
-        @keyframes framePulse {
-          0%, 100% { stroke-opacity: 0.6; }
-          50% { stroke-opacity: 1; }
         }
       `}</style>
     </div>
@@ -949,18 +1003,19 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
-          Tyre Tread Scanner
+          Selective Tread Recording
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          Only the tread-aligned portion of the video will be saved
+          Only the tread inside the green frame will be captured — perfect, cropped output
         </p>
       </div>
 
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '◎', label: 'Point rear camera at the tyre tread' },
+          { icon: '◎', label: 'Point rear camera at the tread' },
           { icon: '▭', label: 'Align tread inside the green frame' },
-          { icon: '●', label: 'Tap scan when aligned — only tread portion saves' },
+          { icon: '✂', label: 'Only the framed area is recorded' },
+          { icon: '●', label: 'Tap scan to start, tap stop when finished' },
         ].map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -1015,11 +1070,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 // ─── HOME ────────────────────────────────────────────────────────────────────
 const Home: React.FC = () => {
   const [stage, setStage] = useState<'home' | 'prompt' | 'camera'>('home');
-  const [capturedScans, setCapturedScans] = useState<Array<{
-    videoUrl: string;
-    trimRange: { start: number; end: number };
-    timestamp: Date;
-  }>>([]);
+  const [capturedVideos, setCapturedVideos] = useState<string[]>([]);
 
   return (
     <div style={{
@@ -1055,10 +1106,10 @@ const Home: React.FC = () => {
             <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase' }}>APOLLO SYSTEM</span>
           </div>
           <h1 style={{ fontSize: 40, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-1.5px', lineHeight: 1.1 }}>
-            Tread<span style={{ color: '#00d47a' }}>Select</span>
+            Tread<span style={{ color: '#00d47a' }}>Scan</span>
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-            Records & saves only the tread-aligned portion
+            AI-powered tyre tread depth analysis
           </p>
         </div>
 
@@ -1087,9 +1138,9 @@ const Home: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, letterSpacing: '0.25em', margin: '0 0 8px', textTransform: 'uppercase' }}>Tap to begin</p>
               <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Tyre Scan</h2>
-              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Only tread portion is saved</p>
+              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Selective frame recording</p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {['Smart trim', 'HD capture', 'Auto-align'].map(f => (
+                {['Selective capture', 'Cropped output', 'Full tread'].map(f => (
                   <span key={f} style={{
                     padding: '4px 12px', borderRadius: 20,
                     background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)',
@@ -1101,20 +1152,37 @@ const Home: React.FC = () => {
           </div>
         </button>
 
-        {capturedScans.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 28 }}>
+          {[
+            { value: '±0.1', unit: 'mm', label: 'Accuracy' },
+            { value: 'Crop', unit: '', label: 'Mode' },
+            { value: 'HD', unit: '', label: 'Output' },
+          ].map(s => (
+            <div key={s.label} style={{
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 14, padding: '14px 10px', textAlign: 'center',
+            }}>
+              <div style={{ marginBottom: 2 }}>
+                <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.5px' }}>{s.value}</span>
+                <span style={{ fontSize: 11, color: '#00d47a', fontWeight: 600 }}>{s.unit}</span>
+              </div>
+              <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, margin: 0 }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {capturedVideos.length > 0 && (
           <div style={{ marginBottom: 28 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'rgba(255,255,255,0.65)' }}>Captured Tread Scans</h3>
-              <span style={{ padding: '2px 10px', borderRadius: 20, background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)', color: '#00d47a', fontSize: 11 }}>{capturedScans.length}</span>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'rgba(255,255,255,0.65)' }}>Recent Scans</h3>
+              <span style={{ padding: '2px 10px', borderRadius: 20, background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)', color: '#00d47a', fontSize: 11 }}>{capturedVideos.length}</span>
             </div>
-            {capturedScans.map((scan, i) => (
+            {capturedVideos.map((url, i) => (
               <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 12, marginBottom: 10 }}>
-                <video src={scan.videoUrl} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+                <video src={url} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedScans.length - i}</span>
-                  </div>
-                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Tread Only</span>
+                  <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Cropped</span>
                 </div>
               </div>
             ))}
@@ -1125,9 +1193,9 @@ const Home: React.FC = () => {
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
           {([
             ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
-            ['Hold phone steady, align tread', 'Wait for green alignment indicator'],
-            ['Tap scan when aligned', 'Recording begins automatically'],
-            ['Only aligned portion is saved', 'System crops to the tread area only'],
+            ['Hold phone in portrait mode', 'Point rear camera at the tyre tread'],
+            ['Align tread in green frame', 'Only the framed area will be recorded'],
+            ['Tap scan to start, stop when done', 'Perfectly cropped output video'],
           ] as [string, string][]).map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
               <div style={{
@@ -1152,16 +1220,8 @@ const Home: React.FC = () => {
         />
       )}
       {stage === 'camera' && (
-        <TyreTreadRecorder
-          onCapture={(trimmedBlob, originalBlob, trimRange) => {
-            console.log('Captured tread-only video:', { trimmedBlob, trimRange, originalBlob });
-            setCapturedScans(prev => [{
-              videoUrl: URL.createObjectURL(trimmedBlob),
-              trimRange,
-              timestamp: new Date(),
-            }, ...prev]);
-            setStage('home');
-          }}
+        <CameraCapture
+          onCapture={(url: string) => { setCapturedVideos((p: string[]) => [url, ...p]); setStage('home'); }}
           onClose={() => setStage('home')}
         />
       )}
