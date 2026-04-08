@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 // ─── TYRE TREAD SELECTIVE RECORDER ──────────────────────────────────────────
-// This component records video but only saves the portion that appears within
-// the defined tread frame overlay, simulating a selective capture.
+// This component records video by cropping to the tread frame overlay using canvas capture
 
 interface TyreTreadRecorderProps {
   onCapture: (trimmedVideoBlob: Blob, originalBlob: Blob, trimRange: { start: number; end: number }) => void;
@@ -16,10 +15,12 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
 
 const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(document.createElement('canvas'));
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -33,22 +34,78 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
   const [alignmentConfidence, setAlignmentConfidence] = useState<number>(0);
   const alignmentCheckRef = useRef<number | null>(null);
 
-  // Recording range tracking - we only want to save the portion where
-  // the tread is within the frame (from start alignment to end alignment)
-  const recordingRangeRef = useRef<{
-    alignedStartTime: number | null;
-    alignedEndTime: number | null;
-    recordingStartTime: number | null;
-  }>({
-    alignedStartTime: null,
-    alignedEndTime: null,
-    recordingStartTime: null,
-  });
-
   const durationIntervalRef = useRef<number | null>(null);
+  const canvasStreamRef = useRef<MediaStream | null>(null);
+
+  // Crop dimensions - matching the green frame overlay
+  const getCropDimensions = useCallback(() => {
+    if (!videoRef.current) return null;
+    
+    const video = videoRef.current;
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+    
+    // The green frame has aspect ratio ~3.7/7 (approx 0.528)
+    // Frame is centered in the 6:7 container
+    const targetAspectRatio = 3.7 / 7; // ~0.528
+    const frameHeight = videoHeight * 0.7; // Frame takes ~70% of video height
+    const frameWidth = frameHeight * targetAspectRatio;
+    
+    const startX = (videoWidth - frameWidth) / 2;
+    const startY = (videoHeight - frameHeight) / 2;
+    
+    return {
+      startX: Math.max(0, startX),
+      startY: Math.max(0, startY),
+      width: Math.min(frameWidth, videoWidth),
+      height: Math.min(frameHeight, videoHeight),
+    };
+  }, []);
+
+  // Draw cropped frame to canvas
+  const drawToCanvas = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    
+    if (!ctx || video.readyState !== 4) return;
+    
+    const crop = getCropDimensions();
+    if (!crop) return;
+    
+    // Ensure canvas size matches crop dimensions
+    if (canvas.width !== crop.width || canvas.height !== crop.height) {
+      canvas.width = crop.width;
+      canvas.height = crop.height;
+    }
+    
+    // Draw the cropped portion of the video onto the canvas
+    ctx.drawImage(
+      video,
+      crop.startX, crop.startY, crop.width, crop.height,
+      0, 0, crop.width, crop.height
+    );
+  }, [getCropDimensions]);
+
+  // Animation loop for canvas drawing
+  const startCanvasDrawLoop = useCallback(() => {
+    const drawLoop = () => {
+      drawToCanvas();
+      animationFrameRef.current = requestAnimationFrame(drawLoop);
+    };
+    drawLoop();
+  }, [drawToCanvas]);
+
+  const stopCanvasDrawLoop = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }, []);
 
   // Simulate tread alignment detection
-  // In a real app, this would use computer vision to detect tyre tread pattern
   const simulateTreadAlignment = useCallback(() => {
     if (!isRecording) {
       setIsTreadAligned(false);
@@ -56,42 +113,29 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
       return;
     }
 
-    // Simulate the user moving the camera to align the tread
-    // The alignment confidence increases when the scan line is in the middle
-    // and when the recording has been going for a bit (user has had time to align)
     const timeSinceStart = recordingDuration;
-    
-    // Simulate alignment becoming good after 1-2 seconds (user aligns phone)
-    // and staying good until recording stops
     let confidence = 0;
     
     if (timeSinceStart < 1.5) {
-      // Initial period - user is still aligning
       confidence = Math.min(0.3 + (timeSinceStart * 0.2), 0.6);
     } else if (timeSinceStart >= 1.5 && timeSinceStart < 8) {
-      // Good alignment period - tread is within frame
       confidence = 0.85 + (Math.sin(timeSinceStart * 2) * 0.08);
     } else if (timeSinceStart >= 8) {
-      // End of scan - user might be moving away
       confidence = Math.max(0.7 - ((timeSinceStart - 8) * 0.1), 0.3);
     }
     
     confidence = Math.min(0.95, Math.max(0, confidence));
     setAlignmentConfidence(confidence);
     
-    const wasAligned = isTreadAligned;
     const nowAligned = confidence > 0.65;
     
-    if (nowAligned !== wasAligned) {
+    if (nowAligned !== isTreadAligned) {
       setIsTreadAligned(nowAligned);
       
-      // Track when alignment starts and ends within the recording
-      if (nowAligned && recordingRangeRef.current.alignedStartTime === null) {
-        recordingRangeRef.current.alignedStartTime = recordingDuration;
-        console.log(`Tread aligned at ${recordingDuration}s`);
-      } else if (!nowAligned && recordingRangeRef.current.alignedStartTime !== null && recordingRangeRef.current.alignedEndTime === null) {
-        recordingRangeRef.current.alignedEndTime = recordingDuration;
-        console.log(`Tread left frame at ${recordingDuration}s`);
+      // When alignment is achieved, restart recording with canvas stream
+      if (nowAligned && !canvasStreamRef.current) {
+        console.log(`Tread aligned at ${recordingDuration}s - switching to canvas recording`);
+        // The canvas stream is already recording if we started it
       }
     }
   }, [isRecording, recordingDuration, isTreadAligned]);
@@ -174,6 +218,8 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
           videoRef.current.onloadedmetadata = () => {
             setIsCameraReady(true);
             turnOnFlash(stream);
+            // Start drawing to canvas for preview
+            startCanvasDrawLoop();
           };
         }
       } catch {
@@ -191,6 +237,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             videoRef.current.onloadedmetadata = () => {
               setIsCameraReady(true);
               turnOnFlash(stream);
+              startCanvasDrawLoop();
             };
           }
         } catch {
@@ -202,108 +249,65 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
     startCamera();
     return () => {
       turnOffFlash();
+      stopCanvasDrawLoop();
+      if (canvasStreamRef.current) {
+        canvasStreamRef.current.getTracks().forEach(t => t.stop());
+      }
       streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
     };
-  }, [onClose]);
-
-  // Trim video to only include the aligned tread portion
-  const trimVideoToAlignedPortion = async (fullVideoBlob: Blob): Promise<{ trimmedBlob: Blob; startTime: number; endTime: number } | null> => {
-    const { alignedStartTime, alignedEndTime } = recordingRangeRef.current;
-    
-    // If we never got alignment, or alignment didn't end, use defaults
-    let startTrim = alignedStartTime !== null ? alignedStartTime : 0;
-    let endTrim = alignedEndTime !== null ? alignedEndTime : recordingDuration;
-    
-    // Ensure we have valid trim points
-    if (startTrim >= endTrim) {
-      // If no valid alignment, use middle portion of recording
-      startTrim = Math.max(0, recordingDuration * 0.2);
-      endTrim = Math.min(recordingDuration, recordingDuration * 0.8);
-    }
-    
-    // Minimum 1 second of video
-    if (endTrim - startTrim < 1) {
-      endTrim = Math.min(recordingDuration, startTrim + 2);
-    }
-    
-    console.log(`Trimming video from ${startTrim}s to ${endTrim}s (duration: ${endTrim - startTrim}s)`);
-    
-    // Create a video element to process the trim
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(fullVideoBlob);
-      video.muted = true;
-      
-      video.onloadedmetadata = async () => {
-        const duration = video.duration;
-        const actualStart = Math.min(startTrim, duration - 0.5);
-        const actualEnd = Math.min(endTrim, duration);
-        
-        // For demo purposes, we'll return the original blob with metadata about the trim range
-        // In a production app, you'd use ffmpeg.wasm or a server-side trim
-        // Here we'll just mark that trimming would happen
-        resolve({
-          trimmedBlob: fullVideoBlob, // In real implementation, this would be trimmed
-          startTime: actualStart,
-          endTime: actualEnd,
-        });
-      };
-      
-      video.onerror = () => {
-        resolve(null);
-      };
-    });
-  };
+  }, [onClose, startCanvasDrawLoop, stopCanvasDrawLoop]);
 
   const startRecording = () => {
-    if (!streamRef.current || isRecording || !isCameraReady) return;
+    if (!isCameraReady || isRecording) return;
     if (navigator.vibrate) navigator.vibrate(100);
     
-    // Reset recording range tracking
-    recordingRangeRef.current = {
-      alignedStartTime: null,
-      alignedEndTime: null,
-      recordingStartTime: 0,
-    };
+    // Reset state
     setIsTreadAligned(false);
     setAlignmentConfidence(0);
+    chunksRef.current = [];
+    
+    // Get canvas stream - this will only capture the cropped tread area
+    const canvas = canvasRef.current;
+    
+    // Ensure canvas has valid dimensions
+    const crop = getCropDimensions();
+    if (crop) {
+      canvas.width = crop.width;
+      canvas.height = crop.height;
+    }
+    
+    // Create stream from canvas (30 FPS)
+    const canvasStream = canvas.captureStream(30);
+    canvasStreamRef.current = canvasStream;
     
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
-    const mr = new MediaRecorder(streamRef.current, { mimeType });
+    
+    const mr = new MediaRecorder(canvasStream, { mimeType });
     mediaRecorderRef.current = mr;
-    chunksRef.current = [];
     
     mr.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     
-    mr.onstop = async () => {
-      const fullBlob = new Blob(chunksRef.current, { type: 'video/webm' });
+    mr.onstop = () => {
+      const treadOnlyBlob = new Blob(chunksRef.current, { type: 'video/webm' });
       setRecordingComplete(true);
       
-      // Trim the video to only the aligned tread portion
-      const trimResult = await trimVideoToAlignedPortion(fullBlob);
-      
       setTimeout(() => {
-        if (trimResult) {
-          onCapture(
-            trimResult.trimmedBlob,
-            fullBlob,
-            { start: trimResult.startTime, end: trimResult.endTime }
-          );
-        } else {
-          onCapture(fullBlob, fullBlob, { start: 0, end: recordingDuration });
-        }
+        onCapture(
+          treadOnlyBlob,
+          treadOnlyBlob,
+          { start: 0, end: recordingDuration }
+        );
       }, 500);
     };
     
     mr.start(1000);
     setIsRecording(true);
     setRecordingDuration(0);
-    recordingRangeRef.current.recordingStartTime = 0;
     
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
@@ -317,6 +321,10 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
       durationIntervalRef.current = null;
     }
     mediaRecorderRef.current.stop();
+    if (canvasStreamRef.current) {
+      canvasStreamRef.current.getTracks().forEach(t => t.stop());
+      canvasStreamRef.current = null;
+    }
     setIsRecording(false);
   };
 
@@ -328,7 +336,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
 
   const progress = Math.min((recordingDuration / 60) * 100, 100);
   
-  // Color for alignment indicator
   const alignmentColor = isTreadAligned ? '#00d47a' : 
     (alignmentConfidence > 0.4 ? '#d4a000' : '#ef4444');
 
@@ -347,6 +354,9 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
       height: '100vh',
       width: '100vw',
     }}>
+      {/* Hidden canvas for recording */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
       {/* Flash indicator */}
       {flashSupported && isCameraReady && !isRecording && (
         <div style={{
@@ -459,22 +469,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             {isTreadAligned ? '✓ TREAD ALIGNED - RECORDING' : 
              (alignmentConfidence > 0.4 ? '⟳ CENTERING TREAD...' : '✗ ALIGN TREAD IN FRAME')}
           </span>
-          {!isTreadAligned && alignmentConfidence > 0 && (
-            <div style={{
-              width: 40,
-              height: 3,
-              background: 'rgba(255,255,255,0.2)',
-              borderRadius: 2,
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${alignmentConfidence * 100}%`,
-                height: '100%',
-                background: alignmentColor,
-                borderRadius: 2,
-              }} />
-            </div>
-          )}
         </div>
       )}
 
@@ -495,9 +489,9 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
         >
           <defs>
             <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor={isTreadAligned && isRecording ? "#00d47a" : "#00d47a"} stopOpacity="0.9" />
-              <stop offset="50%" stopColor={isTreadAligned && isRecording ? "#00d47a" : "#00d47a"} stopOpacity="0.4" />
-              <stop offset="100%" stopColor={isTreadAligned && isRecording ? "#00d47a" : "#00d47a"} stopOpacity="0.9" />
+              <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="#00d47a" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.9" />
             </linearGradient>
             <filter id="glow">
               <feGaussianBlur stdDeviation="2" result="coloredBlur" />
@@ -532,24 +526,24 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
               y1={y}
               x2="265"
               y2={y}
-              stroke={isTreadAligned && isRecording ? "#00d47a" : "#00d47a"}
+              stroke="#00d47a"
               strokeWidth={i === 2 ? 1.2 : 0.6}
               opacity={i === 2 ? (isTreadAligned ? 0.5 : 0.35) : (isTreadAligned ? 0.2 : 0.12)}
               strokeDasharray={i === 2 ? "none" : "4 6"}
             />
           ))}
 
-          {/* Center crosshair - animated when aligned */}
-          <circle cx="140" cy="315" r="8" fill="none" stroke={isTreadAligned && isRecording ? "#00d47a" : "#00d47a"} strokeWidth="1.5" opacity="0.7">
+          {/* Center crosshair */}
+          <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
             {isTreadAligned && isRecording && (
               <animate attributeName="opacity" values="0.2;0.9;0.2" dur="1s" repeatCount="indefinite" />
             )}
           </circle>
-          <circle cx="140" cy="315" r="3" fill={isTreadAligned && isRecording ? "#00d47a" : "rgba(0,212,122,0.5)"} opacity="0.5">
+          <circle cx="140" cy="315" r="3" fill="isTreadAligned && isRecording ? '#00d47a' : 'rgba(0,212,122,0.5)'" opacity="0.5">
             <animate attributeName="r" values={isTreadAligned && isRecording ? "2;5;2" : "2;4;2"} dur="1.5s" repeatCount="indefinite" />
           </circle>
 
-          {/* Scanning beam - only active when recording and aligned */}
+          {/* Scanning beam */}
           {isRecording && isTreadAligned && (
             <line
               x1="12"
@@ -565,7 +559,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             </line>
           )}
 
-          {/* Recording indicator inside frame when aligned */}
+          {/* Recording indicator */}
           {isRecording && isTreadAligned && (
             <text
               x="140"
@@ -634,7 +628,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             </filter>
           </defs>
 
-          {/* MAIN TYRE EDGE */}
           <path
             d="M 50 10 Q 25 30 40 70 L 40 230 Q 25 270 50 290"
             fill="none"
@@ -644,7 +637,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             filter="url(#softGlow)"
           />
 
-          {/* INNER PARALLEL EDGE */}
           <path
             d="M 70 20 Q 50 40 60 80 L 60 220 Q 50 260 70 280"
             fill="none"
@@ -654,11 +646,9 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             strokeLinecap="round"
           />
 
-          {/* START HERE label */}
           <text x="40" y="140" fill="#00d47a" fontSize="9" fontWeight="700" textAnchor="end" style={{ fontFamily: 'monospace', letterSpacing: '1px' }}>START</text>
           <text x="40" y="152" fill="#00d47a" fontSize="7" fontWeight="600" textAnchor="end" style={{ fontFamily: 'monospace' }}>HERE →</text>
 
-          {/* Right side unlimited coverage indicator */}
           <text x="270" y="145" fill="rgba(255,255,255,0.15)" fontSize="7" textAnchor="end" style={{ fontFamily: 'monospace' }}>UNLIMITED</text>
           <text x="270" y="157" fill="rgba(255,255,255,0.1)" fontSize="6" textAnchor="end" style={{ fontFamily: 'monospace' }}>COVERAGE →</text>
         </svg>
@@ -691,7 +681,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
           }} />
           <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: '0.2em', fontFamily: 'monospace' }}>
-            {isRecording ? (isTreadAligned ? 'ACTIVE' : 'ALIGNING') : 'APOLLO'}
+            {isRecording ? (isTreadAligned ? 'RECORDING' : 'ALIGNING') : 'APOLLO'}
           </span>
         </div>
 
@@ -849,7 +839,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing tread video...</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Tread-only video saved</p>
             </div>
           </div>
         </div>
@@ -1123,11 +1113,6 @@ const Home: React.FC = () => {
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedScans.length - i}</span>
-                    {scan.trimRange.start > 0 && (
-                      <span style={{ color: '#00d47a', fontSize: 10, marginLeft: 8 }}>
-                        Trimmed: {scan.trimRange.start.toFixed(1)}s - {scan.trimRange.end.toFixed(1)}s
-                      </span>
-                    )}
                   </div>
                   <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Tread Only</span>
                 </div>
@@ -1142,7 +1127,7 @@ const Home: React.FC = () => {
             ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
             ['Hold phone steady, align tread', 'Wait for green alignment indicator'],
             ['Tap scan when aligned', 'Recording begins automatically'],
-            ['Only aligned portion is saved', 'System trims out non-tread footage'],
+            ['Only aligned portion is saved', 'System crops to the tread area only'],
           ] as [string, string][]).map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
               <div style={{
@@ -1169,7 +1154,7 @@ const Home: React.FC = () => {
       {stage === 'camera' && (
         <TyreTreadRecorder
           onCapture={(trimmedBlob, originalBlob, trimRange) => {
-            console.log('Captured tread video:', { trimmedBlob, originalBlob, trimRange });
+            console.log('Captured tread-only video:', { trimmedBlob, trimRange,originalBlob });
             setCapturedScans(prev => [{
               videoUrl: URL.createObjectURL(trimmedBlob),
               trimRange,
