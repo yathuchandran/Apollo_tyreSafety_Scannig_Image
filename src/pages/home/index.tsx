@@ -55,7 +55,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
     const startY = (videoHeight - frameHeight) / 2;
     
     // SHIFT CROP MORE TO THE LEFT - move startX left by 15% of frame width
-    const leftShift = frameWidth * 0.5;
+    const leftShift = frameWidth * 0.15;
     startX = Math.max(0, startX - leftShift);
     
     // Adjust width to maintain aspect ratio or expand to the right
