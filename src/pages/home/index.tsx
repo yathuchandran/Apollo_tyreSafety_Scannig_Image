@@ -11,10 +11,6 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
-// interface ExtendedMediaTrackConstraintSet extends MediaTrackConstraintSet {
-//   torch?: boolean;
-// }
-
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -472,7 +468,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       </div>
 
       {/* ══ LEFT SIDE TYRE CURVED EDGE (LANDSCAPE) ══ */}
-      {/* ══ LEFT SIDE TYRE CURVED EDGE (LANDSCAPE) ══ */}
       <div style={{
         position: 'absolute',
         left: 0,
@@ -538,114 +533,48 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             strokeLinecap="round"
           />
 
-          {/* LEFT SIDE RECORDING ZONE INDICATOR */}
-          <rect
-            x="35"
-            y="70"
-            width="40"
-            height="160"
-            fill="rgba(0,212,122,0.08)"
-            stroke="#00d47a"
-            strokeWidth="1.5"
-            strokeDasharray="4 4"
-            rx="4"
-          />
-          
-          {/* LEFT SIDE LABEL */}
-          <text
-            x="55"
-            y="145"
-            fill="#00d47a"
-            fontSize="10"
-            fontWeight="600"
-            textAnchor="middle"
-            transform="rotate(-90, 55, 145)"
-            style={{ fontFamily: 'monospace', letterSpacing: '2px' }}
-          >
-            {isRecording ? 'RECORDING LEFT EDGE' : 'START LEFT EDGE'}
-          </text>
-
-          {/* SMALL TREAD TICKS - Only on left side */}
-          {[80, 110, 140, 170, 200, 230].map((y) => (
+          {/* SMALL TREAD TICKS */}
+          {[60, 100, 140, 180, 220].map((y) => (
             <line
               key={y}
               x1="70"
               y1={y}
               x2="85"
-              y2={y - 8}
+              y2={y - 10}
               stroke="#00d47a"
-              strokeWidth="1.8"
-              opacity="0.8"
+              strokeWidth="1.5"
+              opacity="0.6"
               strokeLinecap="round"
             />
           ))}
 
-          {/* LEFT SIDE SCAN LINE - Only visible during recording */}
+          {/* SCAN LINE */}
           {isRecording && (
-            <>
-              <line
-                x1="35"
-                y1={70 + (scanPct * 1.6)}
-                x2="75"
-                y2={70 + (scanPct * 1.6)}
-                stroke="#00d47a"
-                strokeWidth="2.5"
-                opacity="0.9"
-                filter="url(#softGlow)"
-              >
-                <animate attributeName="opacity" values="0.4;1;0.4" dur="0.3s" repeatCount="indefinite" />
-              </line>
-              {/* Left edge pulse */}
-              <circle
-                cx="55"
-                cy={70 + (scanPct * 1.6)}
-                r="4"
-                fill="#00d47a"
-                opacity="0.6"
-              >
-                <animate attributeName="r" values="2;6;2" dur="0.5s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.8;0.2;0.8" dur="0.5s" repeatCount="indefinite" />
-              </circle>
-            </>
+            <line
+              x1="0"
+              y1={scanPct * 3}
+              x2="300"
+              y2={scanPct * 3}
+              stroke="#00d47a"
+              strokeWidth="2"
+              opacity="0.8"
+            />
           )}
-
-          {/* Right side unlimited indicator */}
-          <path
-            d="M 200 70 L 280 70"
-            fill="none"
-            stroke="rgba(255,255,255,0.15)"
-            strokeWidth="1"
-            strokeDasharray="3 6"
-          />
-          <path
-            d="M 200 230 L 280 230"
-            fill="none"
-            stroke="rgba(255,255,255,0.15)"
-            strokeWidth="1"
-            strokeDasharray="3 6"
-          />
-          <text
-            x="240"
-            y="150"
-            fill="rgba(255,255,255,0.2)"
-            fontSize="8"
-            textAnchor="middle"
-            style={{ fontFamily: 'monospace' }}
-          >
-            UNLIMITED
-          </text>
-          <text
-            x="240"
-            y="162"
-            fill="rgba(255,255,255,0.15)"
-            fontSize="7"
-            textAnchor="middle"
-            style={{ fontFamily: 'monospace' }}
-          >
-            COVERAGE →
-          </text>
         </svg>
       </div>
+
+      {/* ══ CROP OVERLAY (MASKS RIGHT SIDE, LEAVES ONLY LEFT SIDE OF FRAME) ══ */}
+      {/* This overlay blocks out everything to the right of the tyre edge, ensuring video only captures the left side */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: '60%', // Covers from the middle to the right edge
+        background: '#000',
+        zIndex: 14,
+        pointerEvents: 'none',
+      }} />
 
       {/* ══ TOP BAR ══ */}
       <div style={{
