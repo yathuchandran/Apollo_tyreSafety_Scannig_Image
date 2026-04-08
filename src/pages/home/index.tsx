@@ -14,9 +14,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [timeLeft, setTimeLeft] = useState<number>(8);
+  const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
+  
+  const durationIntervalRef = useRef<number|null>(null);
 
   // Animate vertical scan line
   useEffect(() => {
@@ -70,6 +72,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     startCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
     };
   }, [onClose]);
 
@@ -90,18 +93,35 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       setRecordingComplete(true);
       setTimeout(() => onCapture(URL.createObjectURL(blob)), 800);
     };
-    mr.start();
+    mr.start(1000); // Capture in 1-second chunks for better performance
     setIsRecording(true);
-    setTimeLeft(8);
-    let s = 8;
-    const iv = setInterval(() => {
-      s--; setTimeLeft(s);
-      if (s === 0) { clearInterval(iv); mr.stop(); setIsRecording(false); }
+    setRecordingDuration(0);
+    
+    // Track recording duration
+    durationIntervalRef.current = setInterval(() => {
+      setRecordingDuration(prev => prev + 1);
     }, 1000);
   };
 
-  const progress = ((8 - timeLeft) / 8) * 100;
-  const circ = 2 * Math.PI * 28;
+  const stopRecording = () => {
+    if (!isRecording || !mediaRecorderRef.current) return;
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate progress percentage (max 60 seconds for visual feedback)
+  const progress = Math.min((recordingDuration / 60) * 100, 100);
+  // const circ = 2 * Math.PI * 28;
 
   return (
     <div style={{
@@ -208,43 +228,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
           {/* Background tint */}
           <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
-
-          {/* Main curved border - top left */}
-          {/* <path
-            d="M 20 10 L 60 10 Q 70 10 70 20 L 70 50"
-            fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#glow)"
-          /> */}
-          {/* Main curved border - top right */}
-          {/* <path
-            d="M 260 10 L 220 10 Q 210 10 210 20 L 210 50"
-            fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#glow)"
-          /> */}
-          {/* Main curved border - bottom left */}
-          {/* <path
-            d="M 20 620 L 60 620 Q 70 620 70 610 L 70 580"
-            fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#glow)"
-          /> */}
-          {/* Main curved border - bottom right */}
-          {/* <path
-            d="M 260 620 L 220 620 Q 210 620 210 610 L 210 580"
-            fill="none"
-            stroke="url(#frameGrad)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#glow)"
-          /> */}
 
           {/* Secondary curved lines (inner glow lines) */}
           <path
@@ -382,7 +365,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             color: '#00d47a', fontSize: 10, fontWeight: 600,
             letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace',
           }}>
-            {isRecording ? 'SCANNING' : 'ALIGN TYRE TREAD'}
+            {isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'}
           </span>
         </div>
       </div>
@@ -404,10 +387,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             position: 'absolute',
             left: 0,
             top: 0,
-            //  top: -50,
             height: '100%',
             width: '100%',
-            // rotate: '90deg',
           }}
         >
           <defs>
@@ -525,7 +506,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.5)',
             fontSize: 12, fontWeight: 600, fontFamily: 'monospace',
           }}>
-            {isRecording ? `0:0${timeLeft}` : '0:08'}
+            {isRecording ? formatDuration(recordingDuration) : '0:00'}
           </span>
         </div>
       </div>
@@ -548,7 +529,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                   }} />
                 ))}
               </div>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Hold steady · aim at tread</span>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Hold steady · Cover full tread</span>
             </div>
           </div>
         )}
@@ -565,7 +546,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               }} />
             </div>
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-              {8 - timeLeft}s of 8s captured
+              Recording: {formatDuration(recordingDuration)}
             </span>
           </div>
         )}
@@ -581,48 +562,59 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <button
-              onClick={startRecording}
-              disabled={!isCameraReady || isRecording || recordingComplete}
-              style={{
-                position: 'relative', background: 'none', border: 'none', padding: 0,
-                cursor: (!isCameraReady || isRecording || recordingComplete) ? 'not-allowed' : 'pointer',
-                opacity: (!isCameraReady || isRecording || recordingComplete) ? 0.4 : 1,
-              }}
-            >
-              {isRecording && (
-                <svg style={{ position: 'absolute', inset: -6, width: 76, height: 76 }} viewBox="0 0 76 76">
-                  <circle cx="38" cy="38" r="28" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-                  <circle
-                    cx="38" cy="38" r="28" fill="none" stroke="#ef4444" strokeWidth="3"
-                    strokeLinecap="round" strokeDasharray={circ}
-                    strokeDashoffset={circ - (circ * progress) / 100}
-                    transform="rotate(-90 38 38)"
-                    style={{ transition: 'stroke-dashoffset 1s linear' }}
-                  />
-                </svg>
-              )}
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%',
-                border: `2px solid ${isRecording ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.3)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: isRecording ? 'rgba(239,68,68,0.07)' : 'rgba(255,255,255,0.05)',
-              }}>
+            {!isRecording ? (
+              <button
+                onClick={startRecording}
+                disabled={!isCameraReady || recordingComplete}
+                style={{
+                  position: 'relative', background: 'none', border: 'none', padding: 0,
+                  cursor: (!isCameraReady || recordingComplete) ? 'not-allowed' : 'pointer',
+                  opacity: (!isCameraReady || recordingComplete) ? 0.4 : 1,
+                }}
+              >
                 <div style={{
-                  width: 44, height: 44,
-                  borderRadius: isRecording ? 8 : '50%',
-                  background: isRecording ? '#ef4444' : '#00d47a',
-                  transition: 'all 0.3s ease',
-                  boxShadow: isRecording ? '0 0 20px rgba(239,68,68,0.6)' : '0 0 20px rgba(0,212,122,0.55)',
-                }} />
-              </div>
-            </button>
+                  width: 64, height: 64, borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.05)',
+                }}>
+                  <div style={{
+                    width: 44, height: 44,
+                    borderRadius: '50%',
+                    background: '#00d47a',
+                    boxShadow: '0 0 20px rgba(0,212,122,0.55)',
+                  }} />
+                </div>
+              </button>
+            ) : (
+              <button
+                onClick={stopRecording}
+                style={{
+                  position: 'relative', background: 'none', border: 'none', padding: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  border: '2px solid rgba(239,68,68,0.45)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(239,68,68,0.07)',
+                }}>
+                  <div style={{
+                    width: 44, height: 44,
+                    borderRadius: 8,
+                    background: '#ef4444',
+                    boxShadow: '0 0 20px rgba(239,68,68,0.6)',
+                  }} />
+                </div>
+              </button>
+            )}
             <span style={{
               color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.35)',
               fontSize: 10, letterSpacing: '0.08em',
               animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
             }}>
-              {isRecording ? `● ${timeLeft}s` : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
+              {isRecording ? '● STOP' : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
             </span>
           </div>
 
@@ -680,7 +672,6 @@ interface InstructionsPromptProps {
 }
 
 const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onClose }) => (
-  // Fixed to viewport — no scrolling
   <div style={{
     position: 'fixed',
     inset: 0,
@@ -693,12 +684,10 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
     fontFamily: "'DM Sans', sans-serif",
     overflow: 'hidden',
   }}>
-    {/* Ambient glow */}
     <div style={{
       position: 'absolute', inset: 0, pointerEvents: 'none',
       background: 'radial-gradient(ellipse 70% 50% at 50% 60%, rgba(0,210,120,0.07) 0%, transparent 70%)',
     }} />
-    {/* Grid */}
     <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.04, pointerEvents: 'none' }}>
       <defs>
         <pattern id="pg" width="32" height="32" patternUnits="userSpaceOnUse">
@@ -708,7 +697,6 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
       <rect width="100%" height="100%" fill="url(#pg)" />
     </svg>
 
-    {/* Close */}
     <button onClick={onClose} style={{
       position: 'absolute', top: 20, left: 20,
       background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
@@ -718,7 +706,6 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
       zIndex: 1,
     }}>✕</button>
 
-    {/* Wordmark */}
     <div style={{ position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}>
       <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, letterSpacing: '0.35em', textTransform: 'uppercase', fontWeight: 500, whiteSpace: 'nowrap' }}>
         APOLLO · TREAD SCAN
@@ -736,8 +723,6 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
       maxWidth: 360,
       width: '100%',
     }}>
-
-      {/* Phone icon */}
       <div style={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
         <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.15)', animation: 'spin 12s linear infinite' }} />
         <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', border: '1px dashed rgba(0,212,122,0.1)', animation: 'spin 8s linear infinite reverse' }} />
@@ -760,22 +745,20 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
         </svg>
       </div>
 
-      {/* Text */}
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
-          Rotate to Landscape
+          Manual Video Capture
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          Turn your phone sideways — the scanner captures the full tyre tread width in one pass.
+          You control when recording stops — scan the full tyre width at your own pace
         </p>
       </div>
 
-      {/* Steps */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
           { icon: '◎', label: 'Point rear camera at the tread' },
           { icon: '▭', label: 'Align tread inside the green frame' },
-          { icon: '●', label: 'Tap scan — holds steady for 8 seconds' },
+          { icon: '●', label: 'Tap scan to start, tap stop when finished' },
         ].map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -799,7 +782,6 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
         ))}
       </div>
 
-      {/* CTA */}
       <button onClick={onContinue} style={{
         width: '100%',
         background: 'linear-gradient(135deg, #00b863, #00d47a)',
@@ -839,7 +821,6 @@ const Home: React.FC = () => {
       fontFamily: "'DM Sans', sans-serif", color: 'white',
       position: 'relative', overflow: 'hidden',
     }}>
-      {/* Ambient bg */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
         background: 'radial-gradient(ellipse 60% 40% at 30% 20%, rgba(0,212,122,0.06) 0%, transparent 60%), radial-gradient(ellipse 50% 50% at 80% 80%, rgba(0,100,255,0.04) 0%, transparent 60%)',
@@ -854,8 +835,6 @@ const Home: React.FC = () => {
       </svg>
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 440, margin: '0 auto', padding: '0 24px 48px' }}>
-
-        {/* Header */}
         <div style={{ paddingTop: 64, marginBottom: 52 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <div style={{
@@ -873,11 +852,10 @@ const Home: React.FC = () => {
             Tread<span style={{ color: '#00d47a' }}>Scan</span>
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-            AI-powered tyre tread depth analysis in 8 seconds
+            AI-powered tyre tread depth analysis
           </p>
         </div>
 
-        {/* Scan CTA card */}
         <button onClick={() => setStage('prompt')} style={{
           width: '100%', background: 'none',
           border: '1px solid rgba(0,212,122,0.2)', borderRadius: 20,
@@ -903,9 +881,9 @@ const Home: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, letterSpacing: '0.25em', margin: '0 0 8px', textTransform: 'uppercase' }}>Tap to begin</p>
               <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Tyre Scan</h2>
-              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>8-second guided video capture</p>
+              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Manual recording control</p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {['Portrait mode', 'HD capture', 'Auto-timed'].map(f => (
+                {['Manual control', 'HD capture', 'Full tread'].map(f => (
                   <span key={f} style={{
                     padding: '4px 12px', borderRadius: 20,
                     background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)',
@@ -917,11 +895,10 @@ const Home: React.FC = () => {
           </div>
         </button>
 
-        {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 28 }}>
           {[
             { value: '±0.1', unit: 'mm', label: 'Accuracy' },
-            { value: '8', unit: 's', label: 'Scan time' },
+            { value: 'Manual', unit: '', label: 'Control' },
             { value: '4K', unit: '', label: 'Resolution' },
           ].map(s => (
             <div key={s.label} style={{
@@ -937,7 +914,6 @@ const Home: React.FC = () => {
           ))}
         </div>
 
-        {/* Recent scans */}
         {capturedVideos.length > 0 && (
           <div style={{ marginBottom: 28 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -956,14 +932,13 @@ const Home: React.FC = () => {
           </div>
         )}
 
-        {/* How it works */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20 }}>
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
           {([
             ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
             ['Hold phone in portrait mode', 'Point rear camera at the tyre tread'],
             ['Align tread in green frame', 'Centre the tyre in the scan zone'],
-            ['Hold steady for 8 seconds', 'Records then auto-stops and saves'],
+            ['Tap scan to start, stop when done', 'You control the recording duration'],
           ] as [string, string][]).map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
               <div style={{
@@ -981,7 +956,6 @@ const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Overlay screens */}
       {stage === 'prompt' && (
         <InstructionsPrompt
           onContinue={() => setStage('camera')}
