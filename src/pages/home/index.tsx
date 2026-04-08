@@ -210,41 +210,41 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
 
           {/* Main curved border - top left */}
-          <path
+          {/* <path
             d="M 20 10 L 60 10 Q 70 10 70 20 L 70 50"
             fill="none"
             stroke="url(#frameGrad)"
             strokeWidth="3"
             strokeLinecap="round"
             filter="url(#glow)"
-          />
+          /> */}
           {/* Main curved border - top right */}
-          <path
+          {/* <path
             d="M 260 10 L 220 10 Q 210 10 210 20 L 210 50"
             fill="none"
             stroke="url(#frameGrad)"
             strokeWidth="3"
             strokeLinecap="round"
             filter="url(#glow)"
-          />
+          /> */}
           {/* Main curved border - bottom left */}
-          <path
+          {/* <path
             d="M 20 620 L 60 620 Q 70 620 70 610 L 70 580"
             fill="none"
             stroke="url(#frameGrad)"
             strokeWidth="3"
             strokeLinecap="round"
             filter="url(#glow)"
-          />
+          /> */}
           {/* Main curved border - bottom right */}
-          <path
+          {/* <path
             d="M 260 620 L 220 620 Q 210 620 210 610 L 210 580"
             fill="none"
             stroke="url(#frameGrad)"
             strokeWidth="3"
             strokeLinecap="round"
             filter="url(#glow)"
-          />
+          /> */}
 
           {/* Secondary curved lines (inner glow lines) */}
           <path
@@ -406,6 +406,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             top: 0,
             height: '100%',
             width: '100%',
+            rotate: '90deg',
           }}
         >
           <defs>
