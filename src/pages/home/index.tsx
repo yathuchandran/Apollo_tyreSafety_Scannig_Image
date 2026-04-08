@@ -48,7 +48,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           videoRef.current.onloadedmetadata = () => setIsCameraReady(true);
         }
       } catch {
-        // Fallback without exact aspect ratio
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -119,7 +118,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       height: '100vh',
       width: '100vw',
     }}>
-      {/* Camera feed container - 6:7 aspect ratio */}
+      {/* Camera feed container */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -176,7 +175,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         zIndex: 5,
       }} />
 
-      {/* ══ CURVED SCAN FRAME — inspired by the reference image ══ */}
+      {/* ══ CURVED SCAN FRAME (no corner L-bracket arrows) ══ */}
       <div style={{
         position: 'absolute',
         left: '50%',
@@ -187,7 +186,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         pointerEvents: 'none',
         zIndex: 15,
       }}>
-        {/* Curved frame SVG */}
+        {/* Curved frame SVG — corner L-brackets removed */}
         <svg
           viewBox="0 0 280 630"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
@@ -281,7 +280,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             strokeLinecap="round"
           />
 
-          {/* Horizontal guide lines - subtle */}
+          {/* Horizontal guide lines */}
           {[126, 210, 315, 420, 504].map((y, i) => (
             <line
               key={y}
@@ -348,7 +347,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </line>
           )}
 
-          {/* Animated dash border around the frame */}
+          {/* Animated dash border */}
           <rect
             x="8"
             y="8"
@@ -362,16 +361,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             style={{ animation: 'dashMove 4s linear infinite' }}
           />
         </svg>
-
-        {/* Corner L-brackets - matching the curved aesthetic */}
-        {([
-          { top: -2, left: -2, borderTop: '3px solid #00d47a', borderLeft: '3px solid #00d47a', borderRadius: '6px 0 0 0' },
-          { top: -2, right: -2, borderTop: '3px solid #00d47a', borderRight: '3px solid #00d47a', borderRadius: '0 6px 0 0' },
-          { bottom: -2, left: -2, borderBottom: '3px solid #00d47a', borderLeft: '3px solid #00d47a', borderRadius: '0 0 0 6px' },
-          { bottom: -2, right: -2, borderBottom: '3px solid #00d47a', borderRight: '3px solid #00d47a', borderRadius: '0 0 6px 0' },
-        ] as React.CSSProperties[]).map((s, i) => (
-          <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...s, filter: 'drop-shadow(0 0 4px rgba(0,212,122,0.5))' }} />
-        ))}
 
         {/* Frame label */}
         <div style={{
@@ -396,6 +385,102 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             {isRecording ? 'SCANNING' : 'ALIGN TYRE TREAD'}
           </span>
         </div>
+      </div>
+
+      {/* ══ LEFT SIDE TYRE CURVED EDGE (LANDSCAPE) ══ */}
+      <div style={{
+        position: 'absolute',
+        left: 0,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        width: '100%',
+        height: '60%',
+        pointerEvents: 'none',
+        zIndex: 15,
+      }}>
+        <svg
+          viewBox="0 0 300 300"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            height: '100%',
+            width: '100%',
+          }}
+        >
+          <defs>
+            <linearGradient id="tyreGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.2" />
+            </linearGradient>
+            <filter id="softGlow">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* MAIN TYRE EDGE (STRAIGHT + CURVED ENDS) */}
+          <path
+            d="M 50 10 Q 25 30 40 70 L 40 230 Q 25 270 50 290"
+            fill="none"
+            stroke="url(#tyreGlow)"
+            strokeWidth="5"
+            strokeLinecap="round"
+            filter="url(#softGlow)"
+          />
+
+          {/* INNER PARALLEL EDGE */}
+          <path
+            d="M 70 20 Q 50 40 60 80 L 60 220 Q 50 260 70 280"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.4"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+
+          {/* ROUGH EDGE DETAIL */}
+          <path
+            d="M 45 15 Q 20 35 35 75 L 35 235 Q 20 265 45 295"
+            fill="none"
+            stroke="#00d47a"
+            strokeOpacity="0.25"
+            strokeWidth="1.2"
+            strokeDasharray="5 6"
+            strokeLinecap="round"
+          />
+
+          {/* SMALL TREAD TICKS */}
+          {[60, 100, 140, 180, 220].map((y) => (
+            <line
+              key={y}
+              x1="70"
+              y1={y}
+              x2="85"
+              y2={y - 10}
+              stroke="#00d47a"
+              strokeWidth="1.5"
+              opacity="0.6"
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* SCAN LINE */}
+          {isRecording && (
+            <line
+              x1="0"
+              y1={scanPct * 3}
+              x2="300"
+              y2={scanPct * 3}
+              stroke="#00d47a"
+              strokeWidth="2"
+              opacity="0.8"
+            />
+          )}
+        </svg>
       </div>
 
       {/* ══ TOP BAR ══ */}
@@ -450,7 +535,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
         zIndex: 10,
       }}>
-        {/* Progress / hint */}
         {!isRecording && isCameraReady && (
           <div style={{ textAlign: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
@@ -484,9 +568,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           </div>
         )}
 
-        {/* Record button row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          {/* Left badge */}
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             padding: '5px 10px', borderRadius: 8,
@@ -496,7 +578,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>6:7 · HD</span>
           </div>
 
-          {/* Center record button */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <button
               onClick={startRecording}
@@ -543,7 +624,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </span>
           </div>
 
-          {/* Right spacer */}
           <div style={{ width: 72 }} />
         </div>
       </div>
@@ -598,10 +678,16 @@ interface InstructionsPromptProps {
 }
 
 const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onClose }) => (
+  // Fixed to viewport — no scrolling
   <div style={{
-    position: 'absolute', inset: 0, zIndex: 40,
+    position: 'fixed',
+    inset: 0,
+    zIndex: 40,
     background: '#080c10',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
     fontFamily: "'DM Sans', sans-serif",
     overflow: 'hidden',
   }}>
@@ -627,19 +713,30 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
       borderRadius: 12, width: 40, height: 40, cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       color: 'rgba(255,255,255,0.5)', fontSize: 18,
+      zIndex: 1,
     }}>✕</button>
 
     {/* Wordmark */}
-    <div style={{ position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)' }}>
-      <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, letterSpacing: '0.35em', textTransform: 'uppercase', fontWeight: 500 }}>
+    <div style={{ position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}>
+      <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, letterSpacing: '0.35em', textTransform: 'uppercase', fontWeight: 500, whiteSpace: 'nowrap' }}>
         APOLLO · TREAD SCAN
       </span>
     </div>
 
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, padding: '0 32px', maxWidth: 360, width: '100%' }}>
+    <div style={{
+      position: 'relative',
+      zIndex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 24,
+      padding: '60px 32px 32px',
+      maxWidth: 360,
+      width: '100%',
+    }}>
 
       {/* Phone icon */}
-      <div style={{ position: 'relative', width: 150, height: 150 }}>
+      <div style={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
         <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.15)', animation: 'spin 12s linear infinite' }} />
         <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', border: '1px dashed rgba(0,212,122,0.1)', animation: 'spin 8s linear infinite reverse' }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,122,0.1) 0%, transparent 70%)' }} />
@@ -647,7 +744,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'phoneRotate 3s cubic-bezier(0.4,0,0.2,1) infinite',
         }}>
-          <svg width="48" height="82" viewBox="0 0 48 82" fill="none">
+          <svg width="40" height="68" viewBox="0 0 48 82" fill="none">
             <rect x="1" y="1" width="46" height="80" rx="8" fill="rgba(0,212,122,0.06)" stroke="rgba(0,212,122,0.6)" strokeWidth="1.5" />
             <rect x="6" y="10" width="36" height="54" rx="3" fill="rgba(0,212,122,0.04)" stroke="rgba(0,212,122,0.2)" strokeWidth="1" />
             <rect x="18" y="70" width="12" height="3" rx="1.5" fill="rgba(0,212,122,0.4)" />
@@ -663,10 +760,10 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 
       {/* Text */}
       <div style={{ textAlign: 'center' }}>
-        <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 600, margin: '0 0 10px', letterSpacing: '-0.5px' }}>
+        <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
           Rotate to Landscape
         </h2>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
           Turn your phone sideways — the scanner captures the full tyre tread width in one pass.
         </p>
       </div>
@@ -681,7 +778,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
             background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 12, padding: '11px 14px',
+            borderRadius: 12, padding: '10px 14px',
           }}>
             <div style={{
               width: 30, height: 30, borderRadius: 8, flexShrink: 0,
@@ -704,7 +801,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
       <button onClick={onContinue} style={{
         width: '100%',
         background: 'linear-gradient(135deg, #00b863, #00d47a)',
-        border: 'none', borderRadius: 14, padding: '17px 32px',
+        border: 'none', borderRadius: 14, padding: '16px 32px',
         color: '#001a0d', fontSize: 15, fontWeight: 700,
         letterSpacing: '0.2px', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -905,5 +1002,3 @@ const Home: React.FC = () => {
 };
 
 export default Home;
-
-
