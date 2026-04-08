@@ -198,10 +198,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               <stop offset="100%" stopColor="#00d47a" stopOpacity="0.9" />
             </linearGradient>
             <filter id="glow">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
               <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
           </defs>
@@ -403,10 +403,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           style={{
             position: 'absolute',
             left: 0,
-            top: -50,
+            top: 0,
+            //  top: -50,
             height: '100%',
             width: '100%',
-            rotate: '90deg',
+            // rotate: '90deg',
           }}
         >
           <defs>
