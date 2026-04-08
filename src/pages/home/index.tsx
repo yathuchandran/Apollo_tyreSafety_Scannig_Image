@@ -37,7 +37,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
   const durationIntervalRef = useRef<number | null>(null);
   const canvasStreamRef = useRef<MediaStream | null>(null);
 
-  // Crop dimensions - matching the green frame overlay
+  // Crop dimensions - matching the green frame overlay with extra left margin
   const getCropDimensions = useCallback(() => {
     if (!videoRef.current) return null;
     
@@ -46,19 +46,27 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
     const videoHeight = video.videoHeight;
     
     // The green frame has aspect ratio ~3.7/7 (approx 0.528)
-    // Frame is centered in the 6:7 container
     const targetAspectRatio = 3.7 / 7; // ~0.528
     const frameHeight = videoHeight * 0.7; // Frame takes ~70% of video height
-    const frameWidth = frameHeight * targetAspectRatio;
+    let frameWidth = frameHeight * targetAspectRatio;
     
-    const startX = (videoWidth - frameWidth) / 2;
+    // Calculate centered position
+    let startX = (videoWidth - frameWidth) / 2;
     const startY = (videoHeight - frameHeight) / 2;
+    
+    // SHIFT CROP MORE TO THE LEFT - move startX left by 15% of frame width
+    const leftShift = frameWidth * 0.5;
+    startX = Math.max(0, startX - leftShift);
+    
+    // Adjust width to maintain aspect ratio or expand to the right
+    // Expand width slightly to compensate for left shift
+    frameWidth = Math.min(frameWidth * 1.1, videoWidth - startX);
     
     return {
       startX: Math.max(0, startX),
       startY: Math.max(0, startY),
-      width: Math.min(frameWidth, videoWidth),
-      height: Math.min(frameHeight, videoHeight),
+      width: Math.min(frameWidth, videoWidth - startX),
+      height: Math.min(frameHeight, videoHeight - startY),
     };
   }, []);
 
@@ -132,10 +140,8 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
     if (nowAligned !== isTreadAligned) {
       setIsTreadAligned(nowAligned);
       
-      // When alignment is achieved, restart recording with canvas stream
       if (nowAligned && !canvasStreamRef.current) {
-        console.log(`Tread aligned at ${recordingDuration}s - switching to canvas recording`);
-        // The canvas stream is already recording if we started it
+        console.log(`Tread aligned at ${recordingDuration}s - recording`);
       }
     }
   }, [isRecording, recordingDuration, isTreadAligned]);
@@ -218,7 +224,6 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
           videoRef.current.onloadedmetadata = () => {
             setIsCameraReady(true);
             turnOnFlash(stream);
-            // Start drawing to canvas for preview
             startCanvasDrawLoop();
           };
         }
@@ -262,22 +267,17 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
     if (!isCameraReady || isRecording) return;
     if (navigator.vibrate) navigator.vibrate(100);
     
-    // Reset state
     setIsTreadAligned(false);
     setAlignmentConfidence(0);
     chunksRef.current = [];
     
-    // Get canvas stream - this will only capture the cropped tread area
     const canvas = canvasRef.current;
-    
-    // Ensure canvas has valid dimensions
     const crop = getCropDimensions();
     if (crop) {
       canvas.width = crop.width;
       canvas.height = crop.height;
     }
     
-    // Create stream from canvas (30 FPS)
     const canvasStream = canvas.captureStream(30);
     canvasStreamRef.current = canvasStream;
     
@@ -504,7 +504,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
 
           <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
 
-          {/* Frame border - changes intensity based on alignment */}
+          {/* Frame border */}
           <rect
             x="8"
             y="8"
@@ -539,7 +539,7 @@ const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onCapture, onClos
               <animate attributeName="opacity" values="0.2;0.9;0.2" dur="1s" repeatCount="indefinite" />
             )}
           </circle>
-          <circle cx="140" cy="315" r="3" fill="isTreadAligned && isRecording ? '#00d47a' : 'rgba(0,212,122,0.5)'" opacity="0.5">
+          <circle cx="140" cy="315" r="3" fill={isTreadAligned && isRecording ? '#00d47a' : 'rgba(0,212,122,0.5)'} opacity="0.5">
             <animate attributeName="r" values={isTreadAligned && isRecording ? "2;5;2" : "2;4;2"} dur="1.5s" repeatCount="indefinite" />
           </circle>
 
@@ -1154,7 +1154,7 @@ const Home: React.FC = () => {
       {stage === 'camera' && (
         <TyreTreadRecorder
           onCapture={(trimmedBlob, originalBlob, trimRange) => {
-            console.log('Captured tread-only video:', { trimmedBlob, trimRange,originalBlob });
+            console.log('Captured tread-only video:', { trimmedBlob, trimRange, originalBlob });
             setCapturedScans(prev => [{
               videoUrl: URL.createObjectURL(trimmedBlob),
               trimRange,
