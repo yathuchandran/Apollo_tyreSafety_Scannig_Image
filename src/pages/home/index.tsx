@@ -6,19 +6,77 @@ interface CameraCaptureProps {
   onClose: () => void;
 }
 
+// Extended types for torch support
+interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+// interface ExtendedMediaTrackConstraintSet extends MediaTrackConstraintSet {
+//   torch?: boolean;
+// }
+
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
+  const [flashSupported, setFlashSupported] = useState<boolean>(false);
   
   const durationIntervalRef = useRef<number|null>(null);
+
+  // Function to turn on flash
+  const turnOnFlash = async (stream: MediaStream) => {
+    try {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) return;
+      
+      trackRef.current = videoTrack;
+      
+      // Check if flash/torch is supported
+      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+      const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
+      
+      if (hasTorch) {
+        setFlashSupported(true);
+        await videoTrack.applyConstraints({
+          advanced: [{ torch: true }] as any
+        });
+        console.log('Flash turned on');
+      } else {
+        console.log('Flash not supported on this device');
+        setFlashSupported(false);
+      }
+    } catch (error) {
+      console.error('Failed to turn on flash:', error);
+      setFlashSupported(false);
+    }
+  };
+
+  // Function to turn off flash
+  const turnOffFlash = async () => {
+    try {
+      if (trackRef.current) {
+        const capabilities = trackRef.current.getCapabilities() as ExtendedMediaTrackCapabilities;
+        const hasTorch = capabilities.torch !== undefined && capabilities.torch === true;
+        
+        if (hasTorch) {
+          await trackRef.current.applyConstraints({
+            advanced: [{ torch: false }] as any
+          });
+          console.log('Flash turned off');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to turn off flash:', error);
+    }
+  };
 
   // Animate vertical scan line
   useEffect(() => {
@@ -47,7 +105,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           streamRef.current = stream;
-          videoRef.current.onloadedmetadata = () => setIsCameraReady(true);
+          videoRef.current.onloadedmetadata = () => {
+            setIsCameraReady(true);
+            // Turn on flash when camera is ready
+            turnOnFlash(stream);
+          };
         }
       } catch {
         try {
@@ -61,7 +123,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
             streamRef.current = stream;
-            videoRef.current.onloadedmetadata = () => setIsCameraReady(true);
+            videoRef.current.onloadedmetadata = () => {
+              setIsCameraReady(true);
+              // Turn on flash when camera is ready
+              turnOnFlash(stream);
+            };
           }
         } catch {
           alert('Camera access denied. Please enable camera permissions.');
@@ -71,6 +137,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
     startCamera();
     return () => {
+      // Turn off flash before cleanup
+      turnOffFlash();
       streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
     };
@@ -121,7 +189,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   // Calculate progress percentage (max 60 seconds for visual feedback)
   const progress = Math.min((recordingDuration / 60) * 100, 100);
-  // const circ = 2 * Math.PI * 28;
 
   return (
     <div style={{
@@ -138,6 +205,40 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       height: '100vh',
       width: '100vw',
     }}>
+      {/* Flash indicator */}
+      {flashSupported && isCameraReady && !isRecording && (
+        <div style={{
+          position: 'absolute',
+          top: 70,
+          right: 20,
+          zIndex: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(8px)',
+          padding: '6px 12px',
+          borderRadius: 20,
+          border: '1px solid rgba(255,255,255,0.1)',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: '#FFD700',
+            boxShadow: '0 0 8px #FFD700',
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }} />
+          <span style={{
+            color: '#FFD700',
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: '0.5px',
+          }}>FLASH ON</span>
+        </div>
+      )}
+
       {/* Camera feed container */}
       <div style={{
         position: 'absolute',
@@ -659,6 +760,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           from{transform:scale(0.5);opacity:0}
           60%{transform:scale(1.06)}
           to{transform:scale(1);opacity:1}
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 0.4; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.2); }
         }
       `}</style>
     </div>
