@@ -403,7 +403,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           style={{
             position: 'absolute',
             left: 0,
-            top: 0,
+            top: -50,
             height: '100%',
             width: '100%',
             rotate: '90deg',
