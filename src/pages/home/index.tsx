@@ -239,17 +239,29 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       if (e.data.size > 0) originalChunksRef.current.push(e.data);
     };
 
-    croppedRecorder.onstop = () => {
-      const croppedBlob = new Blob(chunksRef.current, { type: 'video/webm' });
-      const croppedUrl = URL.createObjectURL(croppedBlob);
-      
-      originalRecorder.onstop = () => {
+    // Handle completion when BOTH recorders are done
+    let croppedStopped = false;
+    let originalStopped = false;
+
+    const checkBothStopped = () => {
+      if (croppedStopped && originalStopped) {
+        const croppedBlob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const croppedUrl = URL.createObjectURL(croppedBlob);
         const originalBlob = new Blob(originalChunksRef.current, { type: 'video/webm' });
         const originalUrl = URL.createObjectURL(originalBlob);
         setRecordingComplete(true);
         setTimeout(() => onCapture(croppedUrl, originalUrl), 800);
-      };
-      originalRecorder.stop();
+      }
+    };
+
+    croppedRecorder.onstop = () => {
+      croppedStopped = true;
+      checkBothStopped();
+    };
+
+    originalRecorder.onstop = () => {
+      originalStopped = true;
+      checkBothStopped();
     };
 
     croppedRecorder.start(1000);
@@ -262,12 +274,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   };
 
   const stopRecording = () => {
-    if (!isRecording || !mediaRecorderRef.current) return;
+    if (!isRecording) return;
+    
+    // Stop BOTH recorders properly
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    if (originalMediaRecorderRef.current && originalMediaRecorderRef.current.state === 'recording') {
+      originalMediaRecorderRef.current.stop();
+    }
+    
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    mediaRecorderRef.current.stop();
     setIsRecording(false);
     setShowEndFrame(false);
+    
+    if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
   };
+
 
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
