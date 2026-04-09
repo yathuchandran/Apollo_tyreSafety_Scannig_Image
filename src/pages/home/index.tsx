@@ -14,9 +14,9 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const originalMediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const croppedRecorderRef = useRef<MediaRecorder | null>(null);
+  const originalRecorderRef = useRef<MediaRecorder | null>(null);
+  const croppedChunksRef = useRef<Blob[]>([]);
   const originalChunksRef = useRef<Blob[]>([]);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -216,36 +216,38 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     setIsRecording(true);
     drawToCanvas();
 
+    // Clear previous chunks
+    croppedChunksRef.current = [];
+    originalChunksRef.current = [];
+
     // RECORD CROPPED VIDEO FROM CANVAS
     const canvasStream = canvasRef.current.captureStream(30);
-    const croppedMimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
-    const croppedRecorder = new MediaRecorder(canvasStream, { mimeType: croppedMimeType });
-    mediaRecorderRef.current = croppedRecorder;
-    chunksRef.current = [];
+    
+    const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
+    croppedRecorderRef.current = croppedRecorder;
 
     croppedRecorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
+      if (e.data.size > 0) croppedChunksRef.current.push(e.data);
     };
 
     // RECORD ORIGINAL VIDEO FROM CAMERA STREAM
-    const originalStream = streamRef.current;
-    const originalRecorder = new MediaRecorder(originalStream, { mimeType: croppedMimeType });
-    originalMediaRecorderRef.current = originalRecorder;
-    originalChunksRef.current = [];
+    const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
+    originalRecorderRef.current = originalRecorder;
 
     originalRecorder.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0) originalChunksRef.current.push(e.data);
     };
 
-    // Handle completion when BOTH recorders are done
+    // Handle completion when BOTH recorders stop
     let croppedStopped = false;
     let originalStopped = false;
 
-    const checkBothStopped = () => {
+    const finalizeCapture = () => {
       if (croppedStopped && originalStopped) {
-        const croppedBlob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const croppedBlob = new Blob(croppedChunksRef.current, { type: 'video/webm' });
         const croppedUrl = URL.createObjectURL(croppedBlob);
         const originalBlob = new Blob(originalChunksRef.current, { type: 'video/webm' });
         const originalUrl = URL.createObjectURL(originalBlob);
@@ -256,14 +258,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
     croppedRecorder.onstop = () => {
       croppedStopped = true;
-      checkBothStopped();
+      finalizeCapture();
     };
 
     originalRecorder.onstop = () => {
       originalStopped = true;
-      checkBothStopped();
+      finalizeCapture();
     };
 
+    // Start both recorders
     croppedRecorder.start(1000);
     originalRecorder.start(1000);
     
@@ -276,21 +279,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const stopRecording = () => {
     if (!isRecording) return;
     
-    // Stop BOTH recorders properly
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    // Stop BOTH recorders
+    if (croppedRecorderRef.current && croppedRecorderRef.current.state === 'recording') {
+      croppedRecorderRef.current.stop();
     }
-    if (originalMediaRecorderRef.current && originalMediaRecorderRef.current.state === 'recording') {
-      originalMediaRecorderRef.current.stop();
+    if (originalRecorderRef.current && originalRecorderRef.current.state === 'recording') {
+      originalRecorderRef.current.stop();
     }
     
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     setIsRecording(false);
     setShowEndFrame(false);
     
-    if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
   };
-
 
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -1342,7 +1347,6 @@ const Home: React.FC = () => {
                   <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
                   <button
                     onClick={() => {
-                      // Download both videos
                       const a = document.createElement('a');
                       a.href = video.cropped;
                       a.download = `tread_scan_cropped_${Date.now()}.webm`;
