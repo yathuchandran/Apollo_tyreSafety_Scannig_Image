@@ -20,15 +20,20 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
+  
+  // NEW: State for frame guidance (START frame visible first, then END frame)
+  const [showStartFrame, setShowStartFrame] = useState<boolean>(true);
+  const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
+  const [frameTransitionDone, setFrameTransitionDone] = useState<boolean>(false);
 
   const durationIntervalRef = useRef<number | null>(null);
+  const frameTimeoutRef = useRef<number | null>(null);
 
   // Function to turn on flash
   const turnOnFlash = async (stream: MediaStream) => {
@@ -76,9 +81,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   };
 
-
-
-
   // Animate vertical scan line
   useEffect(() => {
     if (!isRecording) { setScanPct(0); return; }
@@ -92,7 +94,39 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     return () => clearInterval(id);
   }, [isRecording]);
 
-  // ─── NEW: CROP LOGIC ──────────────────────────────────────────────────────
+  // NEW: Handle frame transition after 2 seconds of recording
+  useEffect(() => {
+    if (isRecording && !frameTransitionDone) {
+      // Clear any existing timeout
+      if (frameTimeoutRef.current) clearTimeout(frameTimeoutRef.current);
+      
+      // Set timeout to transition frames after 2 seconds
+      frameTimeoutRef.current = window.setTimeout(() => {
+        setShowStartFrame(false);
+        setShowEndFrame(true);
+        setFrameTransitionDone(true);
+        
+        // Vibrate to alert user of transition
+        if (navigator.vibrate) navigator.vibrate(200);
+      }, 2000);
+    }
+    
+    return () => {
+      if (frameTimeoutRef.current) clearTimeout(frameTimeoutRef.current);
+    };
+  }, [isRecording, frameTransitionDone]);
+
+  // Reset frame states when recording stops
+  useEffect(() => {
+    if (!isRecording) {
+      setShowStartFrame(true);
+      setShowEndFrame(false);
+      setFrameTransitionDone(false);
+      if (frameTimeoutRef.current) clearTimeout(frameTimeoutRef.current);
+    }
+  }, [isRecording]);
+
+  // ─── CROP LOGIC ──────────────────────────────────────────────────────
   const drawToCanvas = () => {
     if (!canvasRef.current || !videoRef.current || !isRecording) return;
 
@@ -105,32 +139,30 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // --- ADJUST THESE TWO VALUES ---
-    const leftTrimPercent = 0.40;  // Increase this to trim more from the left
+    // --- CROP CONFIGURATION ---
+    const leftTrimPercent = 0.40;  // Trim from left
     const topTrimPercent = 0.20;   // Vertical start position
     const heightPercent = 0.30;    // Height of the recording strip
 
-    // 1. Calculate the starting X point (the trim)
+    // Calculate source area
     const sx = video.videoWidth * leftTrimPercent;
     const sy = video.videoHeight * topTrimPercent;
-
-    // 2. Calculate Width to go from the 'sx' all the way to the 'Right End'
-    // This ensures no cropping happens on the right side.
     const sWidth = video.videoWidth - sx;
     const sHeight = video.videoHeight * heightPercent;
 
-    // 3. Match canvas size to this new wide aspect ratio
+    // Set canvas dimensions
     canvas.width = sWidth;
     canvas.height = sHeight;
 
     ctx.drawImage(
       video,
-      sx, sy, sWidth, sHeight, // Source area
-      0, 0, sWidth, sHeight    // Canvas area
+      sx, sy, sWidth, sHeight,
+      0, 0, sWidth, sHeight
     );
 
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
   };
+
   // Start canvas drawing when recording begins
   useEffect(() => {
     if (isRecording && videoRef.current) {
@@ -199,18 +231,24 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (canvasRef.current) document.body.removeChild(canvasRef.current);
+      if (frameTimeoutRef.current) clearTimeout(frameTimeoutRef.current);
     };
   }, [onClose]);
 
   const startRecording = () => {
     if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current) return;
 
+    // Reset frame states
+    setShowStartFrame(true);
+    setShowEndFrame(false);
+    setFrameTransitionDone(false);
+    
     // Start the canvas drawing loop
     setIsRecording(true);
     drawToCanvas();
 
     // RECORD FROM CANVAS, NOT CAMERA
-    const canvasStream = canvasRef.current.captureStream(30); // 30 FPS
+    const canvasStream = canvasRef.current.captureStream(30);
 
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
@@ -379,7 +417,19 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               <stop offset="50%" stopColor="#00d47a" stopOpacity="0.4" />
               <stop offset="100%" stopColor="#00d47a" stopOpacity="0.9" />
             </linearGradient>
+            <linearGradient id="endFrameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="#ef4444" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.9" />
+            </linearGradient>
             <filter id="glow">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="redGlow">
               <feGaussianBlur stdDeviation="2" result="coloredBlur" />
               <feMerge>
                 <feMergeNode in="coloredBlur" />
@@ -393,32 +443,32 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           <path
             d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
             fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
+            stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
+            strokeOpacity={showEndFrame ? 0.7 : 0.35}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
           <path
             d="M 252 18 L 222 18 Q 218 18 218 22 L 218 48"
             fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
+            stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
+            strokeOpacity={showEndFrame ? 0.7 : 0.35}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
           <path
             d="M 28 612 L 58 612 Q 62 612 62 608 L 62 582"
             fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
+            stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
+            strokeOpacity={showEndFrame ? 0.7 : 0.35}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
           <path
             d="M 252 612 L 222 612 Q 218 612 218 608 L 218 582"
             fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
+            stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
+            strokeOpacity={showEndFrame ? 0.7 : 0.35}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
@@ -430,21 +480,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               y1={y}
               x2="265"
               y2={y}
-              stroke="#00d47a"
+              stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
               strokeWidth={i === 2 ? 1.2 : 0.6}
-              opacity={i === 2 ? 0.35 : 0.12}
+              opacity={i === 2 ? (showEndFrame ? 0.6 : 0.35) : (showEndFrame ? 0.25 : 0.12)}
               strokeDasharray={i === 2 ? "none" : "4 6"}
             />
           ))}
 
-          <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
+          <circle cx="140" cy="315" r="8" fill="none" stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")} strokeWidth="1.5" opacity="0.7">
             <animate attributeName="opacity" values="0.2;0.9;0.2" dur="2s" repeatCount="indefinite" />
           </circle>
-          <circle cx="140" cy="315" r="3" fill="#00d47a" opacity="0.5">
+          <circle cx="140" cy="315" r="3" fill={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")} opacity="0.5">
             <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite" />
           </circle>
-          <line x1="122" y1="315" x2="158" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
-          <line x1="140" y1="297" x2="140" y2="333" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
+          <line x1="122" y1="315" x2="158" y2="315" stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")} strokeWidth="0.8" opacity="0.4" />
+          <line x1="140" y1="297" x2="140" y2="333" stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")} strokeWidth="0.8" opacity="0.4" />
 
           {[126, 210, 315, 420, 504].map((y, i) => (
             <g key={`tick-${y}`}>
@@ -453,7 +503,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                 y1={y}
                 x2={i === 2 ? 20 : 17}
                 y2={y}
-                stroke="#00d47a"
+                stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
                 strokeWidth={i === 2 ? 2 : 1}
                 opacity="0.5"
                 strokeLinecap="round"
@@ -463,7 +513,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                 y1={y}
                 x2={i === 2 ? 260 : 263}
                 y2={y}
-                stroke="#00d47a"
+                stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
                 strokeWidth={i === 2 ? 2 : 1}
                 opacity="0.5"
                 strokeLinecap="round"
@@ -477,10 +527,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               y1={scanPct * 6.3}
               x2="268"
               y2={scanPct * 6.3}
-              stroke="#00d47a"
+              stroke={showStartFrame ? "#00d47a" : (showEndFrame ? "#ef4444" : "#00d47a")}
               strokeWidth="2.5"
               opacity="0.85"
-              filter="url(#glow)"
+              filter={showStartFrame ? "url(#glow)" : "url(#redGlow)"}
             >
               <animate attributeName="opacity" values="0.3;0.95;0.3" dur="0.4s" repeatCount="indefinite" />
             </line>
@@ -493,13 +543,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             height="614"
             rx="12"
             fill="none"
-            stroke="rgba(0,212,122,0.25)"
+            stroke={showStartFrame ? "rgba(0,212,122,0.25)" : (showEndFrame ? "rgba(239,68,68,0.25)" : "rgba(0,212,122,0.25)")}
             strokeWidth="1"
             strokeDasharray="8 6"
             style={{ animation: 'dashMove 4s linear infinite' }}
           />
         </svg>
 
+        {/* Dynamic top label based on frame state */}
         <div style={{
           position: 'absolute', top: -32, left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
@@ -507,211 +558,438 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           backdropFilter: 'blur(4px)',
           padding: '4px 12px',
           borderRadius: 20,
-          border: '1px solid rgba(0,212,122,0.3)',
+          border: `1px solid ${showStartFrame ? 'rgba(0,212,122,0.3)' : (showEndFrame ? 'rgba(239,68,68,0.3)' : 'rgba(0,212,122,0.3)')}`,
         }}>
           <div style={{
             width: 7, height: 7, borderRadius: '50%',
-            background: isRecording ? '#ef4444' : '#00d47a',
-            boxShadow: `0 0 6px ${isRecording ? '#ef4444' : '#00d47a'}`,
+            background: showEndFrame ? '#ef4444' : (isRecording ? '#ef4444' : '#00d47a'),
+            boxShadow: `0 0 6px ${showEndFrame ? '#ef4444' : (isRecording ? '#ef4444' : '#00d47a')}`,
             animation: 'blink 1s ease-in-out infinite',
           }} />
           <span style={{
-            color: '#00d47a', fontSize: 10, fontWeight: 600,
+            color: showStartFrame ? '#00d47a' : (showEndFrame ? '#ef4444' : '#00d47a'),
+            fontSize: 10, fontWeight: 600,
             letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace',
           }}>
-            {isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'}
+            {showStartFrame ? 'START POSITION' : (showEndFrame ? 'STOP AT END OF TREAD →' : (isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'))}
           </span>
         </div>
       </div>
 
-      {/* ══ LEFT SIDE TYRE CURVED EDGE ══ */}
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        top: '50%',
-        transform: 'translateY(-50%)',
-        width: '100%',
-        height: '60%',
-        pointerEvents: 'none',
-        zIndex: 15,
-      }}>
-        <svg
-          viewBox="0 0 300 300"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            height: '100%',
-            width: '100%',
-            rotate: '90deg',
-          }}
-        >
-          <defs>
-            <linearGradient id="tyreGlow" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.2" />
-            </linearGradient>
-            <filter id="softGlow">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          <path
-            d="M 50 10 Q 25 30 40 70 L 40 230 Q 25 270 50 290"
-            fill="none"
-            stroke="url(#tyreGlow)"
-            strokeWidth="5"
-            strokeLinecap="round"
-            filter="url(#softGlow)"
-          />
-
-          <path
-            d="M 70 20 Q 50 40 60 80 L 60 220 Q 50 260 70 280"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.4"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-
-          <path
-            d="M 45 15 Q 20 35 35 75 L 35 235 Q 20 265 45 295"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.25"
-            strokeWidth="1.2"
-            strokeDasharray="5 6"
-            strokeLinecap="round"
-          />
-
-          <line
-            x1="50"
-            y1="70"
-            x2="50"
-            y2="230"
-            stroke="#00d47a"
-            strokeWidth="3"
-            opacity="0.9"
-            strokeDasharray="8 4"
-            filter="url(#softGlow)"
+      {/* ══ LEFT SIDE TYRE CURVED EDGE (START FRAME) ══ */}
+      {showStartFrame && (
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: '100%',
+          height: '60%',
+          pointerEvents: 'none',
+          zIndex: 15,
+          animation: 'pulseFrame 1.5s ease-in-out infinite',
+        }}>
+          <svg
+            viewBox="0 0 300 300"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              height: '100%',
+              width: '100%',
+              rotate: '90deg',
+            }}
           >
-            {isRecording && (
-              <animate attributeName="opacity" values="0.5;1;0.5" dur="1s" repeatCount="indefinite" />
-            )}
-          </line>
+            <defs>
+              <linearGradient id="tyreGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#00d47a" stopOpacity="0.2" />
+              </linearGradient>
+              <filter id="softGlow">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-          <polygon
-            points="55,145 70,135 70,155"
-            fill="#00d47a"
-            opacity="0.8"
-          >
-            {!isRecording && (
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />
-            )}
-          </polygon>
+            <path
+              d="M 50 10 Q 25 30 40 70 L 40 230 Q 25 270 50 290"
+              fill="none"
+              stroke="url(#tyreGlow)"
+              strokeWidth="5"
+              strokeLinecap="round"
+              filter="url(#softGlow)"
+            />
 
-          {isRecording && (
-            <>
-              <line
-                x1="70"
-                y1="145"
-                x2="250"
-                y2="145"
-                stroke="#00d47a"
-                strokeWidth="2"
-                opacity="0.4"
-                strokeDasharray="6 4"
-              >
-                <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
-              </line>
-              <polygon
-                points="250,140 265,145 250,150"
-                fill="#00d47a"
-                opacity="0.6"
-              >
-                <animate attributeName="opacity" values="0.3;0.8;0.3" dur="0.8s" repeatCount="indefinite" />
-              </polygon>
-            </>
-          )}
-
-          <text
-            x="40"
-            y="140"
-            fill="#00d47a"
-            fontSize="9"
-            fontWeight="700"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
-          >
-            START
-          </text>
-          <text
-            x="40"
-            y="152"
-            fill="#00d47a"
-            fontSize="7"
-            fontWeight="600"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace' }}
-          >
-            HERE →
-          </text>
-
-          {[80, 110, 140, 170, 200, 230].map((y) => (
-            <line
-              key={y}
-              x1="55"
-              y1={y}
-              x2="70"
-              y2={y - 8}
+            <path
+              d="M 70 20 Q 50 40 60 80 L 60 220 Q 50 260 70 280"
+              fill="none"
               stroke="#00d47a"
-              strokeWidth="1.5"
-              opacity="0.6"
+              strokeOpacity="0.4"
+              strokeWidth="2.5"
               strokeLinecap="round"
             />
-          ))}
 
-          {isRecording && (
+            <path
+              d="M 45 15 Q 20 35 35 75 L 35 235 Q 20 265 45 295"
+              fill="none"
+              stroke="#00d47a"
+              strokeOpacity="0.25"
+              strokeWidth="1.2"
+              strokeDasharray="5 6"
+              strokeLinecap="round"
+            />
+
             <line
-              x1={50 + (scanPct * 2.2)}
+              x1="50"
               y1="70"
-              x2={50 + (scanPct * 2.2)}
+              x2="50"
               y2="230"
               stroke="#00d47a"
-              strokeWidth="2"
-              opacity="0.7"
+              strokeWidth="3"
+              opacity="0.9"
+              strokeDasharray="8 4"
               filter="url(#softGlow)"
             >
-              <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.4s" repeatCount="indefinite" />
+              {isRecording && (
+                <animate attributeName="opacity" values="0.5;1;0.5" dur="1s" repeatCount="indefinite" />
+              )}
             </line>
-          )}
 
-          <text
-            x="270"
-            y="145"
-            fill="rgba(255,255,255,0.15)"
-            fontSize="7"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace' }}
+            <polygon
+              points="55,145 70,135 70,155"
+              fill="#00d47a"
+              opacity="0.8"
+            >
+              {!isRecording && (
+                <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />
+              )}
+            </polygon>
+
+            {isRecording && (
+              <>
+                <line
+                  x1="70"
+                  y1="145"
+                  x2="250"
+                  y2="145"
+                  stroke="#00d47a"
+                  strokeWidth="2"
+                  opacity="0.4"
+                  strokeDasharray="6 4"
+                >
+                  <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
+                </line>
+                <polygon
+                  points="250,140 265,145 250,150"
+                  fill="#00d47a"
+                  opacity="0.6"
+                >
+                  <animate attributeName="opacity" values="0.3;0.8;0.3" dur="0.8s" repeatCount="indefinite" />
+                </polygon>
+              </>
+            )}
+
+            <text
+              x="40"
+              y="140"
+              fill="#00d47a"
+              fontSize="9"
+              fontWeight="700"
+              textAnchor="end"
+              style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
+            >
+              START
+            </text>
+            <text
+              x="40"
+              y="152"
+              fill="#00d47a"
+              fontSize="7"
+              fontWeight="600"
+              textAnchor="end"
+              style={{ fontFamily: 'monospace' }}
+            >
+              HERE →
+            </text>
+
+            {[80, 110, 140, 170, 200, 230].map((y) => (
+              <line
+                key={y}
+                x1="55"
+                y1={y}
+                x2="70"
+                y2={y - 8}
+                stroke="#00d47a"
+                strokeWidth="1.5"
+                opacity="0.6"
+                strokeLinecap="round"
+              />
+            ))}
+
+            {isRecording && (
+              <line
+                x1={50 + (scanPct * 2.2)}
+                y1="70"
+                x2={50 + (scanPct * 2.2)}
+                y2="230"
+                stroke="#00d47a"
+                strokeWidth="2"
+                opacity="0.7"
+                filter="url(#softGlow)"
+              >
+                <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.4s" repeatCount="indefinite" />
+              </line>
+            )}
+
+            <text
+              x="270"
+              y="145"
+              fill="rgba(255,255,255,0.15)"
+              fontSize="7"
+              textAnchor="end"
+              style={{ fontFamily: 'monospace' }}
+            >
+              UNLIMITED
+            </text>
+            <text
+              x="270"
+              y="157"
+              fill="rgba(255,255,255,0.1)"
+              fontSize="6"
+              textAnchor="end"
+              style={{ fontFamily: 'monospace' }}
+            >
+              COVERAGE →
+            </text>
+          </svg>
+        </div>
+      )}
+
+      {/* ══ RIGHT SIDE END FRAME (Appears after 2 seconds) ══ */}
+      {showEndFrame && (
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: '100%',
+          height: '60%',
+          pointerEvents: 'none',
+          zIndex: 15,
+          animation: 'pulseRedFrame 1s ease-in-out infinite',
+        }}>
+          <svg
+            viewBox="0 0 300 300"
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              height: '100%',
+              width: '100%',
+              rotate: '-90deg',
+            }}
           >
-            UNLIMITED
-          </text>
-          <text
-            x="270"
-            y="157"
-            fill="rgba(255,255,255,0.1)"
-            fontSize="6"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace' }}
-          >
-            COVERAGE →
-          </text>
-        </svg>
-      </div>
+            <defs>
+              <linearGradient id="endTyreGlow" x1="100%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#ef4444" stopOpacity="0.2" />
+              </linearGradient>
+              <filter id="redSoftGlow">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <path
+              d="M 250 10 Q 275 30 260 70 L 260 230 Q 275 270 250 290"
+              fill="none"
+              stroke="url(#endTyreGlow)"
+              strokeWidth="5"
+              strokeLinecap="round"
+              filter="url(#redSoftGlow)"
+            />
+
+            <path
+              d="M 230 20 Q 250 40 240 80 L 240 220 Q 250 260 230 280"
+              fill="none"
+              stroke="#ef4444"
+              strokeOpacity="0.4"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+
+            <path
+              d="M 255 15 Q 280 35 265 75 L 265 235 Q 280 265 255 295"
+              fill="none"
+              stroke="#ef4444"
+              strokeOpacity="0.25"
+              strokeWidth="1.2"
+              strokeDasharray="5 6"
+              strokeLinecap="round"
+            />
+
+            <line
+              x1="250"
+              y1="70"
+              x2="250"
+              y2="230"
+              stroke="#ef4444"
+              strokeWidth="3"
+              opacity="0.9"
+              strokeDasharray="8 4"
+              filter="url(#redSoftGlow)"
+            />
+
+            <polygon
+              points="245,145 230,135 230,155"
+              fill="#ef4444"
+              opacity="0.8"
+            />
+
+            {isRecording && (
+              <>
+                <line
+                  x1="230"
+                  y1="145"
+                  x2="50"
+                  y2="145"
+                  stroke="#ef4444"
+                  strokeWidth="2"
+                  opacity="0.4"
+                  strokeDasharray="6 4"
+                >
+                  <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
+                </line>
+                <polygon
+                  points="50,140 35,145 50,150"
+                  fill="#ef4444"
+                  opacity="0.6"
+                />
+              </>
+            )}
+
+            <text
+              x="260"
+              y="140"
+              fill="#ef4444"
+              fontSize="9"
+              fontWeight="700"
+              textAnchor="start"
+              style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
+            >
+              END
+            </text>
+            <text
+              x="260"
+              y="152"
+              fill="#ef4444"
+              fontSize="7"
+              fontWeight="600"
+              textAnchor="start"
+              style={{ fontFamily: 'monospace' }}
+            >
+              ← HERE
+            </text>
+
+            {[80, 110, 140, 170, 200, 230].map((y) => (
+              <line
+                key={y}
+                x1="245"
+                y1={y}
+                x2="230"
+                y2={y - 8}
+                stroke="#ef4444"
+                strokeWidth="1.5"
+                opacity="0.6"
+                strokeLinecap="round"
+              />
+            ))}
+
+            {isRecording && (
+              <line
+                x1={250 - (scanPct * 2.2)}
+                y1="70"
+                x2={250 - (scanPct * 2.2)}
+                y2="230"
+                stroke="#ef4444"
+                strokeWidth="2"
+                opacity="0.7"
+                filter="url(#redSoftGlow)"
+              />
+            )}
+
+            <text
+              x="30"
+              y="145"
+              fill="rgba(255,255,255,0.15)"
+              fontSize="7"
+              textAnchor="start"
+              style={{ fontFamily: 'monospace' }}
+            >
+              ← STOP HERE
+            </text>
+            <text
+              x="30"
+              y="157"
+              fill="rgba(255,255,255,0.1)"
+              fontSize="6"
+              textAnchor="start"
+              style={{ fontFamily: 'monospace' }}
+            >
+              AVOID OVERSCAN
+            </text>
+          </svg>
+        </div>
+      )}
+
+      {/* Countdown/timer indicator for frame transition */}
+      {isRecording && showStartFrame && !frameTransitionDone && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 20,
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+            border: '2px solid rgba(0,212,122,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'pulseCountdown 1s ease-in-out infinite',
+          }}>
+            <span style={{
+              color: '#00d47a',
+              fontSize: 32,
+              fontWeight: 700,
+              fontFamily: 'monospace',
+            }}>
+              {Math.max(0, 2 - Math.floor(recordingDuration))}
+            </span>
+          </div>
+          <div style={{
+            textAlign: 'center',
+            marginTop: 12,
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: 11,
+            letterSpacing: '1px',
+          }}>
+            MOVING TO END FRAME...
+          </div>
+        </div>
+      )}
 
       {/* ══ TOP BAR ══ */}
       <div style={{
@@ -788,11 +1066,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             }}>
               <div style={{
                 height: '100%', borderRadius: 2,
-                background: 'linear-gradient(90deg, #00c46e, #00d47a)',
+                background: showEndFrame ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 'linear-gradient(90deg, #00c46e, #00d47a)',
                 width: `${progress}%`, transition: 'width 1s linear',
               }} />
             </div>
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+            <span style={{ color: showEndFrame ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.3)', fontSize: 10 }}>
               Recording: {formatDuration(recordingDuration)}
             </span>
           </div>
@@ -804,8 +1082,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             padding: '5px 10px', borderRadius: 8,
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
           }}>
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>CROP · HD</span>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: showEndFrame ? '#ef4444' : '#00d47a' }} />
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>
+              {showStartFrame ? 'START →' : (showEndFrame ? '← END' : 'CROP · HD')}
+            </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -861,7 +1141,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               fontSize: 10, letterSpacing: '0.08em',
               animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
             }}>
-              {isRecording ? '● STOP' : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
+              {isRecording ? (showEndFrame ? '● STOP NOW' : '● RECORDING...') : (isCameraReady ? 'TAP TO SCAN' : 'LOADING...')}
             </span>
           </div>
 
@@ -910,6 +1190,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         @keyframes pulse {
           0%, 100% { opacity: 0.4; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes pulseFrame {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 1; }
+        }
+        @keyframes pulseRedFrame {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 1; }
+        }
+        @keyframes pulseCountdown {
+          0%, 100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.1); opacity: 1; }
         }
       `}</style>
     </div>
@@ -998,19 +1290,19 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
-          Selective Tread Recording
+          Guided Tread Recording
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          Only the tread inside the green frame will be captured — perfect, cropped output
+          START frame appears first → After 2 seconds, END frame appears → Stop recording at END frame
         </p>
       </div>
 
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '◎', label: 'Point rear camera at the tread' },
-          { icon: '▭', label: 'Align tread inside the green frame' },
-          { icon: '✂', label: 'Only the framed area is recorded' },
-          { icon: '●', label: 'Tap scan to start, tap stop when finished' },
+          { icon: '🟢', label: 'START frame appears — align tyre tread here' },
+          { icon: '⏱️', label: 'After 2 seconds, END frame appears on right' },
+          { icon: '🔴', label: 'Move camera to align tread with END frame' },
+          { icon: '⏹️', label: 'Tap STOP when tread reaches END frame' },
         ].map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -1032,6 +1324,18 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
             }}>{i + 1}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{
+        background: 'rgba(239,68,68,0.1)',
+        border: '1px solid rgba(239,68,68,0.2)',
+        borderRadius: 12,
+        padding: '12px 16px',
+        marginTop: 8,
+      }}>
+        <p style={{ color: '#ef4444', fontSize: 12, margin: 0, textAlign: 'center' }}>
+          ⚠️ Stop recording exactly when tread reaches the RED END frame to avoid overscan!
+        </p>
       </div>
 
       <button onClick={onContinue} style={{
@@ -1133,9 +1437,9 @@ const Home: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, letterSpacing: '0.25em', margin: '0 0 8px', textTransform: 'uppercase' }}>Tap to begin</p>
               <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Tyre Scan</h2>
-              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Selective frame recording</p>
+              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Guided START → END recording</p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {['Selective capture', 'Cropped output', 'Full tread'].map(f => (
+                {['START frame', '2s transition', 'END frame'].map(f => (
                   <span key={f} style={{
                     padding: '4px 12px', borderRadius: 20,
                     background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)',
@@ -1150,7 +1454,7 @@ const Home: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 28 }}>
           {[
             { value: '±0.1', unit: 'mm', label: 'Accuracy' },
-            { value: 'Crop', unit: '', label: 'Mode' },
+            { value: 'Guide', unit: '', label: 'Mode' },
             { value: 'HD', unit: '', label: 'Output' },
           ].map(s => (
             <div key={s.label} style={{
@@ -1177,7 +1481,7 @@ const Home: React.FC = () => {
                 <video src={url} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Cropped</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Guided</span>
                 </div>
               </div>
             ))}
@@ -1188,9 +1492,9 @@ const Home: React.FC = () => {
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
           {([
             ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
-            ['Hold phone in portrait mode', 'Point rear camera at the tyre tread'],
-            ['Align tread in green frame', 'Only the framed area will be recorded'],
-            ['Tap scan to start, stop when done', 'Perfectly cropped output video'],
+            ['Align tread with GREEN START frame', 'Begin recording — timer starts'],
+            ['After 2 seconds, RED END frame appears', 'Move camera to align tread with END frame'],
+            ['Tap STOP when tread reaches END', 'Perfectly cropped output video'],
           ] as [string, string][]).map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
               <div style={{
