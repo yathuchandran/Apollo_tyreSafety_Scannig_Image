@@ -27,7 +27,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
   
-  // NEW: Track if we've passed the 2-second mark to switch frames
+  // Track if we've passed the 2-second mark to switch frames
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
 
   const durationIntervalRef = useRef<number | null>(null);
@@ -91,7 +91,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     return () => clearInterval(id);
   }, [isRecording]);
 
-  // NEW: Monitor recording duration to switch frames at 2 seconds
+  // Monitor recording duration to switch frames at 2 seconds
   useEffect(() => {
     if (isRecording && recordingDuration >= 2) {
       setShowEndFrame(true);
@@ -113,7 +113,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // These values define the recording area from LEFT frame to RIGHT frame
+    // EDIT THESE VALUES TO ALIGN WITH YOUR GREEN UI FRAMES
     const leftStartPct = 0.35;  // START frame position (left)
     const rightEndPct = 0.65;   // END frame position (right)
     const topStartPct = 0.20;   // Vertical start position
@@ -536,7 +536,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       </div>
 
       {/* ══ LEFT SIDE TYRE CURVED EDGE (START FRAME) ══ */}
-      {/* Show only when NOT recording OR recording but less than 2 seconds */}
+      {/* Show when NOT recording OR recording but less than 2 seconds */}
       {(!isRecording || (isRecording && !showEndFrame)) && (
         <div style={{
           position: 'absolute',
@@ -707,7 +707,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       )}
 
       {/* ══ RIGHT SIDE TYRE CURVED EDGE (END FRAME) ══ */}
-      {/* Show only when recording AND passed 2 seconds */}
+      {/* Show ONLY when recording AND passed 2 seconds */}
       {(isRecording && showEndFrame) && (
         <div style={{
           position: 'absolute',
