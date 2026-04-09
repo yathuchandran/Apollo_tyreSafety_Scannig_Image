@@ -29,6 +29,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const durationIntervalRef = useRef<number | null>(null);
 
+  // Landscape crop dimensions - tall vertical slice on the LEFT side
+  const CROP_CONFIG = {
+    widthPercent: 0.28,      // 28% of video width (vertical slice)
+    heightPercent: 0.82,     // 82% of video height
+    leftOffset: 60,          // pixels from left edge
+  };
+
   // Function to turn on flash
   const turnOnFlash = async (stream: MediaStream) => {
     try {
@@ -75,7 +82,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   };
 
-  // Animate vertical scan line
+  // Animate vertical scan line (moves horizontally in landscape)
   useEffect(() => {
     if (!isRecording) { setScanPct(0); return; }
     let x = 0; let dir = 1;
@@ -88,7 +95,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     return () => clearInterval(id);
   }, [isRecording]);
 
-  // Draw cropped frame to canvas for selective recording
+  // Draw cropped frame to canvas for selective recording (LANDSCAPE LEFT SIDE)
   const drawToCanvas = () => {
     if (!canvasRef.current || !videoRef.current || !isRecording) return;
     
@@ -101,35 +108,25 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // Calculate crop dimensions matching the green frame (aspect ratio 3.7 / 7 ≈ 0.528)
-    const targetAspectRatio = 3.7 / 7; // ~0.528 (width/height)
-    const videoAspectRatio = video.videoWidth / video.videoHeight;
+    // LANDSCAPE MODE: Crop a vertical slice on the LEFT side
+    // This creates a tall, narrow recording area ideal for tyre tread
+    const cropWidth = video.videoWidth * CROP_CONFIG.widthPercent;
+    const cropHeight = video.videoHeight * CROP_CONFIG.heightPercent;
     
-    let cropWidth, cropHeight, startX, startY;
+    // Position on left side with small offset from edge
+    const startX = CROP_CONFIG.leftOffset;
+    // Center vertically
+    const startY = (video.videoHeight - cropHeight) / 2;
     
-    if (videoAspectRatio > targetAspectRatio) {
-      // Video is wider, crop width to match aspect ratio
-      cropHeight = video.videoHeight;
-      cropWidth = cropHeight * targetAspectRatio;
-      startX = (video.videoWidth - cropWidth) / 2;
-      startY = 0;
-    } else {
-      // Video is taller, crop height to match aspect ratio
-      cropWidth = video.videoWidth;
-      cropHeight = cropWidth / targetAspectRatio;
-      startX = 0;
-      startY = (video.videoHeight - cropHeight) / 2;
-    }
-    
-    // Set canvas dimensions to match cropped area
-    canvas.width = cropWidth;
-    canvas.height = cropHeight;
+    // Ensure even dimensions for encoder compatibility
+    canvas.width = Math.floor(cropWidth);
+    canvas.height = Math.floor(cropHeight);
     
     // Draw the cropped portion to canvas
     ctx.drawImage(
       video,
       startX, startY, cropWidth, cropHeight,
-      0, 0, cropWidth, cropHeight
+      0, 0, canvas.width, canvas.height
     );
     
     // Continue the animation loop
@@ -152,12 +149,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   useEffect(() => {
     const startCamera = async () => {
       try {
+        // Request landscape-friendly resolution (16:9 typical for horizontal)
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 960 },
-            aspectRatio: { exact: 4 / 3 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
         });
         if (videoRef.current) {
@@ -174,7 +171,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             video: {
               facingMode: 'environment',
               width: { ideal: 1280 },
-              height: { ideal: 960 },
+              height: { ideal: 720 },
             },
           });
           if (videoRef.current) {
@@ -258,6 +255,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const progress = Math.min((recordingDuration / 60) * 100, 100);
 
+  // Calculate overlay dimensions to match crop area
+  const overlayWidth = `${CROP_CONFIG.widthPercent * 100}%`;
+  const overlayHeight = `${CROP_CONFIG.heightPercent * 100}%`;
+  const overlayLeft = `${CROP_CONFIG.leftOffset}px`;
+
   return (
     <div style={{
       position: 'fixed',
@@ -307,7 +309,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         </div>
       )}
 
-      {/* Camera feed container */}
+      {/* Camera feed container - full screen for landscape */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -319,34 +321,57 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         justifyContent: 'center',
         overflow: 'hidden',
       }}>
-        <div style={{
-          width: '100%',
-          height: 'auto',
-          aspectRatio: '6 / 7',
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-          />
-        </div>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
       </div>
 
-      {/* Vignette */}
+      {/* Dark vignette overlay outside crop area */}
       <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 90% 130% at 50% 50%, transparent 30%, rgba(0,0,0,0.65) 100%)',
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: 12,
+      }}>
+        {/* Dark overlay with cutout for crop area */}
+        <svg style={{ width: '100%', height: '100%' }}>
+          <defs>
+            <mask id="cropMask">
+              <rect width="100%" height="100%" fill="white" />
+              <rect
+                x={CROP_CONFIG.leftOffset}
+                y={`${((1 - CROP_CONFIG.heightPercent) / 2) * 100}%`}
+                width={`${CROP_CONFIG.widthPercent * 100}%`}
+                height={`${CROP_CONFIG.heightPercent * 100}%`}
+                fill="black"
+                rx="12"
+              />
+            </mask>
+          </defs>
+          <rect
+            width="100%"
+            height="100%"
+            fill="rgba(0,0,0,0.55)"
+            mask="url(#cropMask)"
+          />
+        </svg>
+      </div>
+
+      {/* Vignette effect */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 13,
+        background: 'radial-gradient(ellipse 90% 130% at 50% 50%, transparent 30%, rgba(0,0,0,0.45) 100%)',
       }} />
 
       {/* Top gradient */}
@@ -354,24 +379,24 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         position: 'absolute', top: 0, left: 0, right: 0, height: 100,
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.82), transparent)',
         pointerEvents: 'none',
-        zIndex: 5,
+        zIndex: 10,
       }} />
       {/* Bottom gradient */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 120,
         background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
         pointerEvents: 'none',
-        zIndex: 5,
+        zIndex: 10,
       }} />
 
-      {/* ══ CURVED SCAN FRAME ══ */}
+      {/* ══ LANDSCAPE LEFT-SIDE CROP FRAME ══ */}
       <div style={{
         position: 'absolute',
-        left: '50%',
+        left: overlayLeft,
         top: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: 'min(82%, calc(100% * 6 / 7 * 0.82))',
-        aspectRatio: '3.7 / 7',
+        transform: 'translateY(-50%)',
+        width: overlayWidth,
+        height: overlayHeight,
         pointerEvents: 'none',
         zIndex: 15,
       }}>
@@ -396,6 +421,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
           <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
 
+          {/* Corner decorations */}
           <path
             d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
             fill="none"
@@ -429,6 +455,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             strokeLinecap="round"
           />
 
+          {/* Horizontal guide lines */}
           {[126, 210, 315, 420, 504].map((y, i) => (
             <line
               key={y}
@@ -443,6 +470,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             />
           ))}
 
+          {/* Center target reticle */}
           <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
             <animate attributeName="opacity" values="0.2;0.9;0.2" dur="2s" repeatCount="indefinite" />
           </circle>
@@ -452,6 +480,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           <line x1="122" y1="315" x2="158" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
           <line x1="140" y1="297" x2="140" y2="333" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
 
+          {/* Side tick marks */}
           {[126, 210, 315, 420, 504].map((y, i) => (
             <g key={`tick-${y}`}>
               <line
@@ -477,12 +506,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </g>
           ))}
 
+          {/* Scanning line animation - moves horizontally for landscape */}
           {isRecording && (
             <line
-              x1="12"
-              y1={scanPct * 6.3}
-              x2="268"
-              y2={scanPct * 6.3}
+              x1={scanPct * 2.8}
+              y1="12"
+              x2={scanPct * 2.8}
+              y2="618"
               stroke="#00d47a"
               strokeWidth="2.5"
               opacity="0.85"
@@ -492,6 +522,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </line>
           )}
 
+          {/* Dashed border animation */}
           <rect
             x="8"
             y="8"
@@ -506,6 +537,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           />
         </svg>
 
+        {/* Top label */}
         <div style={{
           position: 'absolute', top: -32, left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
@@ -528,195 +560,17 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             {isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'}
           </span>
         </div>
-      </div>
 
-      {/* ══ LEFT SIDE TYRE CURVED EDGE ══ */}
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        top: '50%',
-        transform: 'translateY(-50%)',
-        width: '100%',
-        height: '60%',
-        pointerEvents: 'none',
-        zIndex: 15,
-      }}>
-        <svg
-          viewBox="0 0 300 300"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            height: '100%',
-            width: '100%',
-            rotate: '90deg',
-          }}
-        >
-          <defs>
-            <linearGradient id="tyreGlow" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.2" />
-            </linearGradient>
-            <filter id="softGlow">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          <path
-            d="M 50 10 Q 25 30 40 70 L 40 230 Q 25 270 50 290"
-            fill="none"
-            stroke="url(#tyreGlow)"
-            strokeWidth="5"
-            strokeLinecap="round"
-            filter="url(#softGlow)"
-          />
-
-          <path
-            d="M 70 20 Q 50 40 60 80 L 60 220 Q 50 260 70 280"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.4"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-
-          <path
-            d="M 45 15 Q 20 35 35 75 L 35 235 Q 20 265 45 295"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.25"
-            strokeWidth="1.2"
-            strokeDasharray="5 6"
-            strokeLinecap="round"
-          />
-
-          <line
-            x1="50"
-            y1="70"
-            x2="50"
-            y2="230"
-            stroke="#00d47a"
-            strokeWidth="3"
-            opacity="0.9"
-            strokeDasharray="8 4"
-            filter="url(#softGlow)"
-          >
-            {isRecording && (
-              <animate attributeName="opacity" values="0.5;1;0.5" dur="1s" repeatCount="indefinite" />
-            )}
-          </line>
-
-          <polygon
-            points="55,145 70,135 70,155"
-            fill="#00d47a"
-            opacity="0.8"
-          >
-            {!isRecording && (
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />
-            )}
-          </polygon>
-
-          {isRecording && (
-            <>
-              <line
-                x1="70"
-                y1="145"
-                x2="250"
-                y2="145"
-                stroke="#00d47a"
-                strokeWidth="2"
-                opacity="0.4"
-                strokeDasharray="6 4"
-              >
-                <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
-              </line>
-              <polygon
-                points="250,140 265,145 250,150"
-                fill="#00d47a"
-                opacity="0.6"
-              >
-                <animate attributeName="opacity" values="0.3;0.8;0.3" dur="0.8s" repeatCount="indefinite" />
-              </polygon>
-            </>
-          )}
-
-          <text
-            x="40"
-            y="140"
-            fill="#00d47a"
-            fontSize="9"
-            fontWeight="700"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
-          >
-            START
-          </text>
-          <text
-            x="40"
-            y="152"
-            fill="#00d47a"
-            fontSize="7"
-            fontWeight="600"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace' }}
-          >
-            HERE →
-          </text>
-
-          {[80, 110, 140, 170, 200, 230].map((y) => (
-            <line
-              key={y}
-              x1="55"
-              y1={y}
-              x2="70"
-              y2={y - 8}
-              stroke="#00d47a"
-              strokeWidth="1.5"
-              opacity="0.6"
-              strokeLinecap="round"
-            />
-          ))}
-
-          {isRecording && (
-            <line
-              x1={50 + (scanPct * 2.2)}
-              y1="70"
-              x2={50 + (scanPct * 2.2)}
-              y2="230"
-              stroke="#00d47a"
-              strokeWidth="2"
-              opacity="0.7"
-              filter="url(#softGlow)"
-            >
-              <animate attributeName="opacity" values="0.3;0.9;0.3" dur="0.4s" repeatCount="indefinite" />
-            </line>
-          )}
-
-          <text
-            x="270"
-            y="145"
-            fill="rgba(255,255,255,0.15)"
-            fontSize="7"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace' }}
-          >
-            UNLIMITED
-          </text>
-          <text
-            x="270"
-            y="157"
-            fill="rgba(255,255,255,0.1)"
-            fontSize="6"
-            textAnchor="end"
-            style={{ fontFamily: 'monospace' }}
-          >
-            COVERAGE →
-          </text>
-        </svg>
+        {/* Left side arrow indicator */}
+        <div style={{
+          position: 'absolute', left: -40, top: '50%', transform: 'translateY(-50%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d47a" strokeWidth="2">
+            <path d="M22 12H2M2 12l5-5M2 12l5 5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span style={{ color: '#00d47a', fontSize: 9, opacity: 0.7 }}>START</span>
+        </div>
       </div>
 
       {/* ══ TOP BAR ══ */}
@@ -724,7 +578,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: '14px 20px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        zIndex: 10,
+        zIndex: 20,
       }}>
         <button
           onClick={onClose}
@@ -769,7 +623,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         position: 'absolute', bottom: 0, left: 0, right: 0,
         padding: '16px 28px 28px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-        zIndex: 10,
+        zIndex: 20,
       }}>
         {!isRecording && isCameraReady && (
           <div style={{ textAlign: 'center' }}>
@@ -811,7 +665,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
           }}>
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>CROP · HD</span>
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>LANDSCAPE · LEFT CROP</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -881,7 +735,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'fadeIn 0.3s ease',
-          zIndex: 20,
+          zIndex: 30,
         }}>
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
@@ -1004,18 +858,18 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
-          Selective Tread Recording
+          Landscape Tread Recording
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          Only the tread inside the green frame will be captured — perfect, cropped output
+          Hold phone horizontally. The left-side green frame captures only the tyre tread — perfect, cropped output
         </p>
       </div>
 
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '◎', label: 'Point rear camera at the tread' },
-          { icon: '▭', label: 'Align tread inside the green frame' },
-          { icon: '✂', label: 'Only the framed area is recorded' },
+          { icon: '📱', label: 'Hold phone in LANDSCAPE (horizontal) mode' },
+          { icon: '⬅️', label: 'Position tyre tread inside the LEFT green frame' },
+          { icon: '✂', label: 'Only the framed area on left is recorded' },
           { icon: '●', label: 'Tap scan to start, tap stop when finished' },
         ].map((s, i) => (
           <div key={i} style={{
@@ -1139,9 +993,9 @@ const Home: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, letterSpacing: '0.25em', margin: '0 0 8px', textTransform: 'uppercase' }}>Tap to begin</p>
               <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Tyre Scan</h2>
-              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Selective frame recording</p>
+              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Landscape mode · Left-side capture</p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {['Selective capture', 'Cropped output', 'Full tread'].map(f => (
+                {['Left crop', 'Landscape', 'Tread focus'].map(f => (
                   <span key={f} style={{
                     padding: '4px 12px', borderRadius: 20,
                     background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)',
@@ -1156,7 +1010,7 @@ const Home: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 28 }}>
           {[
             { value: '±0.1', unit: 'mm', label: 'Accuracy' },
-            { value: 'Crop', unit: '', label: 'Mode' },
+            { value: 'Left', unit: '', label: 'Crop Side' },
             { value: 'HD', unit: '', label: 'Output' },
           ].map(s => (
             <div key={s.label} style={{
@@ -1183,7 +1037,7 @@ const Home: React.FC = () => {
                 <video src={url} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Cropped</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Left Crop</span>
                 </div>
               </div>
             ))}
@@ -1193,10 +1047,10 @@ const Home: React.FC = () => {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20 }}>
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
           {([
-            ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
-            ['Hold phone in portrait mode', 'Point rear camera at the tyre tread'],
-            ['Align tread in green frame', 'Only the framed area will be recorded'],
-            ['Tap scan to start, stop when done', 'Perfectly cropped output video'],
+            ['Tap "Start Tyre Scan"', 'Launches the landscape camera scanner'],
+            ['Hold phone HORIZONTALLY', 'Point rear camera at the tyre tread'],
+            ['Align tread in LEFT green frame', 'Only the left-side framed area is recorded'],
+            ['Tap scan to start, stop when done', 'Perfectly cropped vertical tread video'],
           ] as [string, string][]).map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 14, marginBottom: i < 3 ? 16 : 0 }}>
               <div style={{
