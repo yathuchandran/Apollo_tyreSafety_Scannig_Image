@@ -94,49 +94,44 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
     // ─── NEW: CROP LOGIC ──────────────────────────────────────────────────────
   const drawToCanvas = () => {
-    if (!canvasRef.current || !videoRef.current || !isRecording) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { alpha: false });
-
-    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
-      animationFrameRef.current = requestAnimationFrame(drawToCanvas);
-      return;
-    }
-
-    // Your UI frame ratio is ~0.528 (3.7 width / 7 height)
-    // For a landscape crop, we calculate based on the source video's actual dimensions
-    const targetAspectRatio = 3.7 / 7;
-    const videoAspectRatio = video.videoWidth / video.videoHeight;
-
-    let cropWidth, cropHeight, startX, startY;
-
-    if (videoAspectRatio > targetAspectRatio) {
-      cropHeight = video.videoHeight;
-      cropWidth = cropHeight * targetAspectRatio;
-      startX = (video.videoWidth - cropWidth) / 2;
-      startY = 0;
-    } else {
-      cropWidth = video.videoWidth;
-      cropHeight = cropWidth / targetAspectRatio;
-      startX = 0;
-      startY = (video.videoHeight - cropHeight) / 2;
-    }
-
-    // Set recording resolution
-    canvas.width = cropWidth;
-    canvas.height = cropHeight;
-
-    // Perform the crop: Source -> Destination
-    ctx.drawImage(
-      video,
-      startX, startY, cropWidth, cropHeight, // Source (the full feed)
-      0, 0, cropWidth, cropHeight             // Destination (the recording)
-    );
-
+  if (!canvasRef.current || !videoRef.current || !isRecording) return;
+  
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  
+  if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
-  };
+    return;
+  }
+
+  // --- EDIT THESE VALUES ---
+  // Increase 'leftTrim' to cut more from the left side
+  const leftTrim = 0.35;      // 0.35 means start 35% from the left edge
+  const topTrim = 0.20;       // Start 20% from the top edge
+  const captureWidth = 0.40;  // Width of the recording window
+  const captureHeight = 0.30; // Height of the recording window
+
+  // Calculate pixel coordinates based on the real video resolution
+  const sx = video.videoWidth * leftTrim;
+  const sy = video.videoHeight * topTrim;
+  const sWidth = video.videoWidth * captureWidth;
+  const sHeight = video.videoHeight * captureHeight;
+
+  // Set the canvas size to match the cropped area
+  // This ensures the final video file has the correct aspect ratio
+  canvas.width = sWidth;
+  canvas.height = sHeight;
+  
+  // Draw the specific slice to the canvas
+  ctx.drawImage(
+    video,
+    sx, sy, sWidth, sHeight, // The "Source" (where we crop)
+    0, 0, sWidth, sHeight    // The "Destination" (on our output canvas)
+  );
+  
+  animationFrameRef.current = requestAnimationFrame(drawToCanvas);
+};
   // Start canvas drawing when recording begins
   useEffect(() => {
     if (isRecording && videoRef.current) {
