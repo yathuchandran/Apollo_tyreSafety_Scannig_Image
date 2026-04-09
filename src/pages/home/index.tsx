@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 
 // ─── CAMERA CAPTURE ──────────────────────────────────────────────────────────
 interface CameraCaptureProps {
-  onCapture: (videoUrl: string) => void;
+  onCapture: (croppedVideoUrl: string, originalVideoUrl: string) => void;
   onClose: () => void;
 }
 
@@ -15,7 +15,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const originalMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const originalChunksRef = useRef<Blob[]>([]);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -26,8 +28,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
-  
-  // Track if we've passed the 2-second mark to switch frames
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
 
   const durationIntervalRef = useRef<number | null>(null);
@@ -113,7 +113,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // EDIT THESE VALUES TO ALIGN WITH YOUR GREEN UI FRAMES
+    // These values define the recording area from LEFT frame to RIGHT frame
     const leftStartPct = 0.35;  // START frame position (left)
     const rightEndPct = 0.65;   // END frame position (right)
     const topStartPct = 0.20;   // Vertical start position
@@ -212,35 +212,49 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const startRecording = () => {
     if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current) return;
 
-    // Reset frame state
     setShowEndFrame(false);
-    
-    // Start the canvas drawing loop
     setIsRecording(true);
     drawToCanvas();
 
-    // RECORD FROM CANVAS, NOT CAMERA
-    const canvasStream = canvasRef.current.captureStream(30); // 30 FPS
-
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+    // RECORD CROPPED VIDEO FROM CANVAS
+    const canvasStream = canvasRef.current.captureStream(30);
+    const croppedMimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
-
-    const mr = new MediaRecorder(canvasStream, { mimeType });
-    mediaRecorderRef.current = mr;
+    const croppedRecorder = new MediaRecorder(canvasStream, { mimeType: croppedMimeType });
+    mediaRecorderRef.current = croppedRecorder;
     chunksRef.current = [];
 
-    mr.ondataavailable = (e: BlobEvent) => {
+    croppedRecorder.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
 
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      setRecordingComplete(true);
-      setTimeout(() => onCapture(URL.createObjectURL(blob)), 800);
+    // RECORD ORIGINAL VIDEO FROM CAMERA STREAM
+    const originalStream = streamRef.current;
+    const originalRecorder = new MediaRecorder(originalStream, { mimeType: croppedMimeType });
+    originalMediaRecorderRef.current = originalRecorder;
+    originalChunksRef.current = [];
+
+    originalRecorder.ondataavailable = (e: BlobEvent) => {
+      if (e.data.size > 0) originalChunksRef.current.push(e.data);
     };
 
-    mr.start(1000);
+    croppedRecorder.onstop = () => {
+      const croppedBlob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const croppedUrl = URL.createObjectURL(croppedBlob);
+      
+      originalRecorder.onstop = () => {
+        const originalBlob = new Blob(originalChunksRef.current, { type: 'video/webm' });
+        const originalUrl = URL.createObjectURL(originalBlob);
+        setRecordingComplete(true);
+        setTimeout(() => onCapture(croppedUrl, originalUrl), 800);
+      };
+      originalRecorder.stop();
+    };
+
+    croppedRecorder.start(1000);
+    originalRecorder.start(1000);
+    
     setRecordingDuration(0);
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
@@ -536,7 +550,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       </div>
 
       {/* ══ LEFT SIDE TYRE CURVED EDGE (START FRAME) ══ */}
-      {/* Show when NOT recording OR recording but less than 2 seconds */}
       {(!isRecording || (isRecording && !showEndFrame)) && (
         <div style={{
           position: 'absolute',
@@ -707,7 +720,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       )}
 
       {/* ══ RIGHT SIDE TYRE CURVED EDGE (END FRAME) ══ */}
-      {/* Show ONLY when recording AND passed 2 seconds */}
       {(isRecording && showEndFrame) && (
         <div style={{
           position: 'absolute',
@@ -744,7 +756,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               </filter>
             </defs>
 
-            {/* Main Curved End Line */}
             <path
               d="M 50 10 Q 25 30 40 70 L 40 230 Q 25 270 50 290"
               fill="none"
@@ -754,7 +765,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               filter="url(#softGlowRight)"
             />
 
-            {/* Secondary Accent Line */}
             <path
               d="M 70 20 Q 50 40 60 80 L 60 220 Q 50 260 70 280"
               fill="none"
@@ -764,7 +774,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               strokeLinecap="round"
             />
 
-            {/* Vertical Dashed Guideline */}
             <line
               x1="50"
               y1="70"
@@ -781,7 +790,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               )}
             </line>
 
-            {/* "End" Labels */}
             <text
               x="40"
               y="140"
@@ -805,7 +813,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               HERE →
             </text>
 
-            {/* Measurement Ticks */}
             {[80, 110, 140, 170, 200, 230].map((y) => (
               <line
                 key={y}
@@ -982,14 +989,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       {/* ══ SCAN COMPLETE ══ */}
       {recordingComplete && (
         <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'fadeIn 0.3s ease',
           zIndex: 20,
+          overflow: 'auto',
         }}>
           <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
             animation: 'scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+            padding: '40px 20px',
+            maxWidth: 500,
+            width: '100%',
           }}>
             <div style={{
               width: 72, height: 72, borderRadius: '50%',
@@ -1002,7 +1013,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing video…</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Tap outside to continue</p>
             </div>
           </div>
         </div>
@@ -1175,7 +1186,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 // ─── HOME ────────────────────────────────────────────────────────────────────
 const Home: React.FC = () => {
   const [stage, setStage] = useState<'home' | 'prompt' | 'camera'>('home');
-  const [capturedVideos, setCapturedVideos] = useState<string[]>([]);
+  const [capturedVideos, setCapturedVideos] = useState<Array<{ cropped: string; original: string }>>([]);
 
   return (
     <div style={{
@@ -1282,12 +1293,56 @@ const Home: React.FC = () => {
               <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'rgba(255,255,255,0.65)' }}>Recent Scans</h3>
               <span style={{ padding: '2px 10px', borderRadius: 20, background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)', color: '#00d47a', fontSize: 11 }}>{capturedVideos.length}</span>
             </div>
-            {capturedVideos.map((url, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 12, marginBottom: 10 }}>
-                <video src={url} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+            {capturedVideos.map((video, i) => (
+              <div key={i} style={{ 
+                background: 'rgba(255,255,255,0.03)', 
+                border: '1px solid rgba(255,255,255,0.07)', 
+                borderRadius: 14, 
+                padding: 12, 
+                marginBottom: 16 
+              }}>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ color: '#00d47a', fontSize: 11, fontWeight: 600 }}>CROPPED VERSION</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Selective Area</span>
+                  </div>
+                  <video src={video.cropped} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600 }}>ORIGINAL (UNCUT)</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>Full Frame</span>
+                  </div>
+                  <video src={video.original} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+                </div>
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Cropped</span>
+                  <button
+                    onClick={() => {
+                      // Download both videos
+                      const a = document.createElement('a');
+                      a.href = video.cropped;
+                      a.download = `tread_scan_cropped_${Date.now()}.webm`;
+                      a.click();
+                      setTimeout(() => {
+                        const b = document.createElement('a');
+                        b.href = video.original;
+                        b.download = `tread_scan_original_${Date.now()}.webm`;
+                        b.click();
+                      }, 500);
+                    }}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: 6,
+                      background: 'rgba(0,212,122,0.1)',
+                      border: '1px solid rgba(0,212,122,0.2)',
+                      color: '#00d47a',
+                      fontSize: 10,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Download Both
+                  </button>
                 </div>
               </div>
             ))}
@@ -1326,7 +1381,10 @@ const Home: React.FC = () => {
       )}
       {stage === 'camera' && (
         <CameraCapture
-          onCapture={(url: string) => { setCapturedVideos((p: string[]) => [url, ...p]); setStage('home'); }}
+          onCapture={(croppedUrl: string, originalUrl: string) => { 
+            setCapturedVideos((p) => [{ cropped: croppedUrl, original: originalUrl }, ...p]); 
+            setStage('home'); 
+          }}
           onClose={() => setStage('home')}
         />
       )}
