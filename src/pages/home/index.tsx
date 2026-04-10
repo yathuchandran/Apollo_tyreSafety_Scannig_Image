@@ -25,7 +25,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
-  const [recordingComplete] = useState<boolean>(false);
+  const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
@@ -213,110 +213,105 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => 
   }, [onClose]);
 
   const startRecording = () => {
-    if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current || !videoRef.current) return;
+  if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current || !videoRef.current) return;
 
-    setShowEndFrame(false);
+  setShowEndFrame(false);
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
 
-    // --- FIX 1: Set dimensions synchronously BEFORE starting the stream ---
-    // const leftTrimPercent = 0.20;
-    // const heightPct = 0.30;
+  // CROP CONTROLS - Adjust these values
+  const leftTrimPercent = 0.20;      // How much to cut from LEFT (20%)
+  const rightTrimPercent = 0.98;     // How much to KEEP from right (98% = 2% trim)
+  const heightPct = 0.30;
+  // const topStartPct = 0.20;
 
-    // const sx = video.videoWidth * leftTrimPercent;
-    // const sWidth = video.videoWidth - sx;
-    // const sHeight = video.videoHeight * heightPct;
+  // Calculate crop dimensions
+  const sx = video.videoWidth * leftTrimPercent;
+  const sWidth = (video.videoWidth * rightTrimPercent) - sx;
+  const sHeight = video.videoHeight * heightPct;
+  // const sy = video.videoHeight * topStartPct;
 
-    // // VP8 encoders strictly prefer even numbers. Using Math.floor prevents 
-    // // decimal pixel tearing and encoding failures.
-    // canvas.width = Math.floor(sWidth / 2) * 2;
-    // canvas.height = Math.floor(sHeight / 2) * 2;
-    // --------------------------------------------------------------------
-    // --- FIX 1: Set dimensions synchronously BEFORE starting the stream ---
-    const leftTrimPercent = 0.20;  // Starts at 20% from the left edge
-    const rightTrimPercent = 0.95; // Ends at 95% of the right edge (Adjust this!)
-    const heightPct = 0.30;        // Captures 30% of the vertical height
+  // Set canvas dimensions (even numbers for VP8 encoder)
+  canvas.width = Math.floor(sWidth / 2) * 2;
+  canvas.height = Math.floor(sHeight / 2) * 2;
+  
+  // Debug logs
+  console.log('=== CROP SETTINGS ===');
+  console.log(`Original video: ${video.videoWidth} x ${video.videoHeight}`);
+  console.log(`Left trim: ${(leftTrimPercent * 100).toFixed(0)}% (starts at ${sx.toFixed(0)}px)`);
+  console.log(`Right trim: ${((1 - rightTrimPercent) * 100).toFixed(1)}% (ends at ${(video.videoWidth * rightTrimPercent).toFixed(0)}px)`);
+  console.log(`Captured area: ${canvas.width} x ${canvas.height}`);
+  console.log('=====================');
 
-    const sx = video.videoWidth * leftTrimPercent;
-    
-    // Calculate total width by finding the exact right edge coordinate 
-    // and subtracting the starting x coordinate.
-    const sWidth = (video.videoWidth * rightTrimPercent) - sx;
-    const sHeight = video.videoHeight * heightPct;
+  // Clear previous chunks
+  croppedChunksRef.current = [];
+  originalChunksRef.current = [];
 
-    // VP8 encoders strictly prefer even numbers. Using Math.floor prevents 
-    // decimal pixel tearing and encoding failures.
-    canvas.width = Math.floor(sWidth / 2) * 2;
-    canvas.height = Math.floor(sHeight / 2) * 2;
-    // --------------------------------------------------------------------
+  // Capture stream AFTER canvas dimensions are set
+  const canvasStream = canvas.captureStream(30);
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+    ? 'video/webm;codecs=vp8'
+    : 'video/webm';
 
-    croppedChunksRef.current = [];
-    originalChunksRef.current = [];
+  // Create cropped recorder
+  const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
+  croppedRecorderRef.current = croppedRecorder;
 
-    // NOW capture the stream (it will lock to the correct 1024x288 resolution)
-    const canvasStream = canvas.captureStream(30);
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-      ? 'video/webm;codecs=vp8'
-      : 'video/webm';
-
-    const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
-    croppedRecorderRef.current = croppedRecorder;
-
-    croppedRecorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data.size > 0) croppedChunksRef.current.push(e.data);
-    };
-
-    const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
-    originalRecorderRef.current = originalRecorder;
-
-    originalRecorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data.size > 0) originalChunksRef.current.push(e.data);
-    };
-
-    // --- MISSING LOGIC ADDED HERE: Process videos when recording stops ---
-    let croppedReady = false;
-    let originalReady = false;
-
-    const processVideos = () => {
-      if (croppedReady && originalReady) {
-        const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
-        const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
-
-        const croppedUrl = URL.createObjectURL(croppedBlob);
-        const originalUrl = URL.createObjectURL(originalBlob);
-
-        // Pass the generated video URLs back to the Home screen
-        onCapture(croppedUrl, originalUrl);
-      }
-    };
-
-    croppedRecorder.onstop = () => {
-      croppedReady = true;
-      processVideos();
-    };
-
-    originalRecorder.onstop = () => {
-      originalReady = true;
-      processVideos();
-    };
-    // ----------------------------------------------------------------------
-
-    croppedRecorder.start(1000);
-    originalRecorder.start(1000);
-
-    recordingStartTimeRef.current = Date.now();
-    setRecordingDuration(0);
-    durationIntervalRef.current = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-    }, 1000);
-
-    // Update state last
-    setIsRecording(true);
-
-    // Start drawing manually since state update is delayed
-    drawToCanvas();
+  croppedRecorder.ondataavailable = (e: BlobEvent) => {
+    if (e.data.size > 0) croppedChunksRef.current.push(e.data);
   };
+
+  // Create original recorder
+  const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
+  originalRecorderRef.current = originalRecorder;
+
+  originalRecorder.ondataavailable = (e: BlobEvent) => {
+    if (e.data.size > 0) originalChunksRef.current.push(e.data);
+  };
+
+  // Handle completion
+  let croppedStopped = false;
+  let originalStopped = false;
+
+  const finalizeCapture = () => {
+    if (croppedStopped && originalStopped) {
+      console.log('Both recorders stopped, creating blobs...');
+      const croppedBlob = new Blob(croppedChunksRef.current, { type: 'video/webm' });
+      const originalBlob = new Blob(originalChunksRef.current, { type: 'video/webm' });
+      const croppedUrl = URL.createObjectURL(croppedBlob);
+      const originalUrl = URL.createObjectURL(originalBlob);
+      setRecordingComplete(true);
+      setTimeout(() => onCapture(croppedUrl, originalUrl), 800);
+    }
+  };
+
+  croppedRecorder.onstop = () => {
+    console.log('Cropped recorder stopped');
+    croppedStopped = true;
+    finalizeCapture();
+  };
+
+  originalRecorder.onstop = () => {
+    console.log('Original recorder stopped');
+    originalStopped = true;
+    finalizeCapture();
+  };
+
+  // Start both recorders
+  croppedRecorder.start(1000);
+  originalRecorder.start(1000);
+
+  recordingStartTimeRef.current = Date.now();
+  setRecordingDuration(0);
+  durationIntervalRef.current = setInterval(() => {
+    setRecordingDuration(prev => prev + 1);
+  }, 1000);
+
+  // Update state and start drawing
+  setIsRecording(true);
+  drawToCanvas();
+};
 
   const stopRecording = () => {
     if (!isRecording) return;
