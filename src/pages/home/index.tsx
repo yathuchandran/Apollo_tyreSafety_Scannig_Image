@@ -103,6 +103,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   }, [recordingDuration, isRecording]);
 
   // ─── SYMMETRICAL CROP LOGIC - ADJUSTABLE ────────────────────────────────────
+  // ─── DYNAMIC CROP LOGIC - Changes based on recording phase ────────────────────
   const drawToCanvas = () => {
     if (!canvasRef.current || !videoRef.current || !isRecording) return;
 
@@ -115,11 +116,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // ADJUST THESE VALUES TO FIT THE TYRE PERFECTLY
-    const leftTrimPercent = 0.20;   // Trim 20% from LEFT (reduce this to show more on left)
-    const rightTrimPercent = 1;  // Keep up to 80% from left (trim 20% from right)
-    const topStartPct = 0.20;       // Vertical start position
-    const heightPct = 0.30;         // Height of the recording strip
+    // Dynamic crop based on whether we're showing the END frame
+    const leftTrimPercent = 0.20;  // Always trim 20% from left (START frame position)
+
+    // CRITICAL: When END frame is visible (after 2 seconds), capture to FULL right edge
+    // This ensures the entire tyre from START to the physical end is captured
+    const rightTrimPercent = showEndFrame ? 1.0 : 0.65;
+
+    const topStartPct = 0.20;   // Vertical start position
+    const heightPct = 0.30;     // Height of the recording strip
 
     // Calculate source rectangle
     const sx = video.videoWidth * leftTrimPercent;
