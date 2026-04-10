@@ -102,7 +102,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   }, [recordingDuration, isRecording]);
 
-  // ─── SYMMETRICAL CROP LOGIC ────────────────────────────────────────────────
+  // ─── SYMMETRICAL CROP LOGIC - ADJUSTABLE ────────────────────────────────────
   const drawToCanvas = () => {
     if (!canvasRef.current || !videoRef.current || !isRecording) return;
 
@@ -115,14 +115,16 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // SYMMETRICAL CROP - Same amount trimmed from both sides
-    const trimPercent = 0.35;      // Trim 35% from LEFT and 35% from RIGHT
-    const topStartPct = 0.20;      // Vertical start position
-    const heightPct = 0.30;        // Height of the recording strip
+    // ADJUST THESE VALUES TO FIT THE TYRE PERFECTLY
+    const leftTrimPercent = 0.20;   // Trim 20% from LEFT (reduce this to show more on left)
+    const rightTrimPercent = 0.80;  // Keep up to 80% from left (trim 20% from right)
+    const topStartPct = 0.20;       // Vertical start position
+    const heightPct = 0.30;         // Height of the recording strip
 
-    const sx = video.videoWidth * trimPercent;
+    // Calculate source rectangle
+    const sx = video.videoWidth * leftTrimPercent;
     const sy = video.videoHeight * topStartPct;
-    const sWidth = video.videoWidth * (1 - (trimPercent * 2));
+    const sWidth = (video.videoWidth * rightTrimPercent) - sx;
     const sHeight = video.videoHeight * heightPct;
 
     canvas.width = Math.max(sWidth, 1);
