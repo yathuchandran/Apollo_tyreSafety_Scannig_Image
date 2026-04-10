@@ -31,6 +31,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
 
   const durationIntervalRef = useRef<number | null>(null);
+  const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingStartTimeRef = useRef<number>(0);
 
   // Function to turn on flash
   const turnOnFlash = async (stream: MediaStream) => {
@@ -100,7 +102,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   }, [recordingDuration, isRecording]);
 
-  // ─── CROP LOGIC - Records from START to END continuously ───────────────────
+  // ─── SYMMETRICAL CROP LOGIC ────────────────────────────────────────────────
   const drawToCanvas = () => {
     if (!canvasRef.current || !videoRef.current || !isRecording) return;
 
@@ -113,26 +115,20 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // SYMMETRICAL CROP VALUES - Same amount trimmed from both sides
+    // SYMMETRICAL CROP - Same amount trimmed from both sides
     const trimPercent = 0.35;      // Trim 35% from LEFT and 35% from RIGHT
     const topStartPct = 0.20;      // Vertical start position
     const heightPct = 0.30;        // Height of the recording strip
 
-    // Calculate source rectangle - TRIM EQUALLY FROM BOTH SIDES
-    const sx = video.videoWidth * trimPercent;           // Start at 35% from left
+    const sx = video.videoWidth * trimPercent;
     const sy = video.videoHeight * topStartPct;
-    const sWidth = video.videoWidth * (1 - (trimPercent * 2));  // Width = 100% - 35% - 35% = 30%
+    const sWidth = video.videoWidth * (1 - (trimPercent * 2));
     const sHeight = video.videoHeight * heightPct;
 
-    // Set canvas resolution to match the cropped area
     canvas.width = Math.max(sWidth, 1);
     canvas.height = Math.max(sHeight, 1);
 
-    ctx.drawImage(
-      video,
-      sx, sy, sWidth, sHeight,
-      0, 0, sWidth, sHeight
-    );
+    ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
 
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
   };
@@ -194,7 +190,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
     startCamera();
 
-    // Create hidden canvas for selective recording
     canvasRef.current = document.createElement('canvas');
     canvasRef.current.style.display = 'none';
     document.body.appendChild(canvasRef.current);
@@ -203,6 +198,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       turnOffFlash();
       streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (canvasRef.current) document.body.removeChild(canvasRef.current);
     };
@@ -213,18 +209,19 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
     setShowEndFrame(false);
     setIsRecording(true);
-    drawToCanvas();
 
-    // Clear previous chunks
     croppedChunksRef.current = [];
     originalChunksRef.current = [];
 
-    // RECORD CROPPED VIDEO FROM CANVAS
+    // Start drawing to canvas
+    drawToCanvas();
+
     const canvasStream = canvasRef.current.captureStream(30);
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
 
+    // Create cropped recorder
     const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
     croppedRecorderRef.current = croppedRecorder;
 
@@ -232,7 +229,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       if (e.data.size > 0) croppedChunksRef.current.push(e.data);
     };
 
-    // RECORD ORIGINAL VIDEO FROM CAMERA STREAM
+    // Create original recorder
     const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
     originalRecorderRef.current = originalRecorder;
 
@@ -240,15 +237,16 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       if (e.data.size > 0) originalChunksRef.current.push(e.data);
     };
 
-    // Handle completion when BOTH recorders stop
+    // Handle completion
     let croppedStopped = false;
     let originalStopped = false;
 
     const finalizeCapture = () => {
       if (croppedStopped && originalStopped) {
+        console.log('Both recorders stopped, creating blobs...');
         const croppedBlob = new Blob(croppedChunksRef.current, { type: 'video/webm' });
-        const croppedUrl = URL.createObjectURL(croppedBlob);
         const originalBlob = new Blob(originalChunksRef.current, { type: 'video/webm' });
+        const croppedUrl = URL.createObjectURL(croppedBlob);
         const originalUrl = URL.createObjectURL(originalBlob);
         setRecordingComplete(true);
         setTimeout(() => onCapture(croppedUrl, originalUrl), 800);
@@ -256,11 +254,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     };
 
     croppedRecorder.onstop = () => {
+      console.log('Cropped recorder stopped');
       croppedStopped = true;
       finalizeCapture();
     };
 
     originalRecorder.onstop = () => {
+      console.log('Original recorder stopped');
       originalStopped = true;
       finalizeCapture();
     };
@@ -269,6 +269,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     croppedRecorder.start(1000);
     originalRecorder.start(1000);
 
+    recordingStartTimeRef.current = Date.now();
     setRecordingDuration(0);
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
@@ -278,7 +279,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const stopRecording = () => {
     if (!isRecording) return;
 
-    // Stop BOTH recorders
+    console.log('Stopping both recorders at the same time...');
+
+    // Get the actual recording duration
+    const actualDuration = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
+    console.log(`Actual recording duration: ${actualDuration} seconds`);
+
+    // Stop BOTH recorders immediately
     if (croppedRecorderRef.current && croppedRecorderRef.current.state === 'recording') {
       croppedRecorderRef.current.stop();
     }
@@ -286,7 +293,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       originalRecorderRef.current.stop();
     }
 
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
     setIsRecording(false);
     setShowEndFrame(false);
 
@@ -1040,7 +1051,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: 'white', fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Scan Complete</p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Tap outside to continue</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Processing video…</p>
             </div>
           </div>
         </div>
