@@ -1236,6 +1236,16 @@ const Home: React.FC = () => {
   const [stage, setStage] = useState<'home' | 'prompt' | 'camera'>('home');
   const [capturedVideos, setCapturedVideos] = useState<Array<{ cropped: string; original: string }>>([]);
 
+  // Helper function to download a video from a URL
+  const downloadVideo = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
     <div style={{
       minHeight: '100vh', background: '#080c10',
@@ -1349,46 +1359,96 @@ const Home: React.FC = () => {
                 padding: 12,
                 marginBottom: 16
               }}>
-                <div style={{ marginBottom: 12 }}>
+                {/* CROPPED VERSION SECTION */}
+                <div style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ color: '#00d47a', fontSize: 11, fontWeight: 600 }}>CROPPED VERSION</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Selective Area</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: '#00d47a', fontSize: 11, fontWeight: 600 }}>CROPPED VERSION</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Selective Area</span>
+                    </div>
+                    <button
+                      onClick={() => downloadVideo(video.cropped, `tread_scan_cropped_${Date.now()}.webm`)}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 6,
+                        background: 'rgba(0,212,122,0.1)',
+                        border: '1px solid rgba(0,212,122,0.25)',
+                        color: '#00d47a',
+                        fontSize: 11,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Download Cropped
+                    </button>
                   </div>
                   <video src={video.cropped} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 </div>
+
+                {/* ORIGINAL VERSION SECTION */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600 }}>ORIGINAL (UNCUT)</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>Full Frame</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600 }}>ORIGINAL (UNCUT)</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>Full Frame</span>
+                    </div>
+                    <button
+                      onClick={() => downloadVideo(video.original, `tread_scan_original_${Date.now()}.webm`)}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 6,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        color: 'rgba(255,255,255,0.6)',
+                        fontSize: 11,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Download Original
+                    </button>
                   </div>
                   <video src={video.original} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 </div>
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                   <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
                   <button
                     onClick={() => {
-                      const a = document.createElement('a');
-                      a.href = video.cropped;
-                      a.download = `tread_scan_cropped_${Date.now()}.webm`;
-                      a.click();
+                      downloadVideo(video.cropped, `tread_scan_cropped_${Date.now()}.webm`);
                       setTimeout(() => {
-                        const b = document.createElement('a');
-                        b.href = video.original;
-                        b.download = `tread_scan_original_${Date.now()}.webm`;
-                        b.click();
-                      }, 500);
+                        downloadVideo(video.original, `tread_scan_original_${Date.now()}.webm`);
+                      }, 150);
                     }}
                     style={{
-                      padding: '4px 12px',
-                      borderRadius: 6,
-                      background: 'rgba(0,212,122,0.1)',
-                      border: '1px solid rgba(0,212,122,0.2)',
+                      padding: '5px 14px',
+                      borderRadius: 20,
+                      background: 'linear-gradient(135deg, rgba(0,212,122,0.15), rgba(0,212,122,0.05))',
+                      border: '1px solid rgba(0,212,122,0.3)',
                       color: '#00d47a',
                       fontSize: 10,
+                      fontWeight: 600,
                       cursor: 'pointer',
+                      letterSpacing: '0.3px',
                     }}
                   >
-                    Download Both
+                    Download Both Videos
                   </button>
                 </div>
               </div>
