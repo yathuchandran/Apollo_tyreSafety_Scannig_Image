@@ -20,6 +20,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
+
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
@@ -75,6 +76,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   };
 
+
+
+
   // Animate vertical scan line
   useEffect(() => {
     if (!isRecording) { setScanPct(0); return; }
@@ -88,54 +92,45 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     return () => clearInterval(id);
   }, [isRecording]);
 
-  // Draw cropped frame to canvas for selective recording
+  // ─── NEW: CROP LOGIC ──────────────────────────────────────────────────────
   const drawToCanvas = () => {
     if (!canvasRef.current || !videoRef.current || !isRecording) return;
-    
+
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { alpha: false });
-    
+
     if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
       animationFrameRef.current = requestAnimationFrame(drawToCanvas);
       return;
     }
 
-    // Calculate crop dimensions matching the green frame (aspect ratio 3.7 / 7 ≈ 0.528)
-    const targetAspectRatio = 3.7 / 7; // ~0.528 (width/height)
-    const videoAspectRatio = video.videoWidth / video.videoHeight;
-    
-    let cropWidth, cropHeight, startX, startY;
-    
-    if (videoAspectRatio > targetAspectRatio) {
-      // Video is wider, crop width to match aspect ratio
-      cropHeight = video.videoHeight;
-      cropWidth = cropHeight * targetAspectRatio;
-      startX = (video.videoWidth - cropWidth) / 2;
-      startY = 0;
-    } else {
-      // Video is taller, crop height to match aspect ratio
-      cropWidth = video.videoWidth;
-      cropHeight = cropWidth / targetAspectRatio;
-      startX = 0;
-      startY = (video.videoHeight - cropHeight) / 2;
-    }
-    
-    // Set canvas dimensions to match cropped area
-    canvas.width = cropWidth;
-    canvas.height = cropHeight;
-    
-    // Draw the cropped portion to canvas
+    // --- ADJUST THESE TWO VALUES ---
+    const leftTrimPercent = 0.40;  // Increase this to trim more from the left
+    const topTrimPercent = 0.20;   // Vertical start position
+    const heightPercent = 0.30;    // Height of the recording strip
+
+    // 1. Calculate the starting X point (the trim)
+    const sx = video.videoWidth * leftTrimPercent;
+    const sy = video.videoHeight * topTrimPercent;
+
+    // 2. Calculate Width to go from the 'sx' all the way to the 'Right End'
+    // This ensures no cropping happens on the right side.
+    const sWidth = video.videoWidth - sx;
+    const sHeight = video.videoHeight * heightPercent;
+
+    // 3. Match canvas size to this new wide aspect ratio
+    canvas.width = sWidth;
+    canvas.height = sHeight;
+
     ctx.drawImage(
       video,
-      startX, startY, cropWidth, cropHeight,
-      0, 0, cropWidth, cropHeight
+      sx, sy, sWidth, sHeight, // Source area
+      0, 0, sWidth, sHeight    // Canvas area
     );
-    
-    // Continue the animation loop
+
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
   };
-
   // Start canvas drawing when recording begins
   useEffect(() => {
     if (isRecording && videoRef.current) {
@@ -192,12 +187,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       }
     };
     startCamera();
-    
+
     // Create hidden canvas for selective recording
     canvasRef.current = document.createElement('canvas');
     canvasRef.current.style.display = 'none';
     document.body.appendChild(canvasRef.current);
-    
+
     return () => {
       turnOffFlash();
       streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
@@ -209,32 +204,34 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const startRecording = () => {
     if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current) return;
-    if (navigator.vibrate) navigator.vibrate(100);
-    
-    // Get canvas stream for selective recording
-    const canvasStream = canvasRef.current.captureStream(30);
-    
+
+    // Start the canvas drawing loop
+    setIsRecording(true);
+    drawToCanvas();
+
+    // RECORD FROM CANVAS, NOT CAMERA
+    const canvasStream = canvasRef.current.captureStream(30); // 30 FPS
+
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
+
     const mr = new MediaRecorder(canvasStream, { mimeType });
     mediaRecorderRef.current = mr;
     chunksRef.current = [];
-    
+
     mr.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
-    
+
     mr.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
       setRecordingComplete(true);
       setTimeout(() => onCapture(URL.createObjectURL(blob)), 800);
     };
-    
-    mr.start(1000);
-    setIsRecording(true);
-    setRecordingDuration(0);
 
+    mr.start(1000);
+    setRecordingDuration(0);
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
     }, 1000);
@@ -242,10 +239,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const stopRecording = () => {
     if (!isRecording || !mediaRecorderRef.current) return;
-    if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = null;
-    }
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     mediaRecorderRef.current.stop();
     setIsRecording(false);
   };
