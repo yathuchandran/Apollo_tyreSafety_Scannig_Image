@@ -11,7 +11,7 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
-const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const croppedRecorderRef = useRef<MediaRecorder | null>(null);
@@ -25,7 +25,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
-  const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
+  const [recordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
@@ -102,9 +102,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   }, [recordingDuration, isRecording]);
 
-  // ─── FIXED DRAW FUNCTION - No canvas resizing, just drawing ─────────────────
+  // ─── SYMMETRICAL CROP LOGIC - ADJUSTABLE ────────────────────────────────────
+  // ─── DYNAMIC CROP LOGIC - Changes based on recording phase ────────────────────
+  // ─── CROP LOGIC - Start with NO right trim, then adjust ────────────────────
+  // ─── SIMPLE CROP LOGIC - Capture from left trim to full right edge ─────
   const drawToCanvas = () => {
-    if (!canvasRef.current || !videoRef.current || !isRecording) return;
+    if (!canvasRef.current || !videoRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -115,14 +118,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       return;
     }
 
-    // Use the pre-calculated canvas dimensions
+    // --- FIX 2: Rely on the canvas dimensions set in startRecording ---
     const leftTrimPercent = 0.20;
     const topStartPct = 0.20;
 
     const sx = video.videoWidth * leftTrimPercent;
     const sy = video.videoHeight * topStartPct;
 
-    // Draw using the canvas dimensions set in startRecording
+    // Draw using the pre-calculated canvas width/height
     ctx.drawImage(
       video,
       sx,
@@ -217,32 +220,50 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    // ─── FIX: Set canvas dimensions synchronously BEFORE starting the stream ───
-    const leftTrimPercent = 0.20;
+    // --- FIX 1: Set dimensions synchronously BEFORE starting the stream ---
+    // const leftTrimPercent = 0.20;
+    // const heightPct = 0.30;
+
+    // const sx = video.videoWidth * leftTrimPercent;
+    // const sWidth = video.videoWidth - sx;
+    // const sHeight = video.videoHeight * heightPct;
+
+    // // VP8 encoders strictly prefer even numbers. Using Math.floor prevents 
+    // // decimal pixel tearing and encoding failures.
+    // canvas.width = Math.floor(sWidth / 2) * 2;
+    // canvas.height = Math.floor(sHeight / 2) * 2;
+    // --------------------------------------------------------------------
+    // --- FIX 1: Set dimensions synchronously BEFORE starting the stream ---
+    const leftTrimPercent = 0.20;   // Start capturing at 20% from the left
+    
+    // NEW: Adjust this value to trim the right side!
+    // 0.80 means it STOPS capturing at 80% of the screen (trimming 20% off the right)
+    // 0.70 means it STOPS capturing at 70% of the screen (trimming 30% off the right)
+    const rightTrimPercent = 0.80;  
+    
     const heightPct = 0.30;
-    // const topStartPct = 0.20;
 
     const sx = video.videoWidth * leftTrimPercent;
-    const sWidth = video.videoWidth - sx;  // Capture ALL the way to the right edge
+    
+    // NEW: Calculate width based on the right end point, minus our starting point
+    const sWidth = (video.videoWidth * rightTrimPercent) - sx;
     const sHeight = video.videoHeight * heightPct;
 
-    // VP8 encoders prefer even numbers - prevent decimal pixel tearing
+    // VP8 encoders strictly prefer even numbers. Using Math.floor prevents 
+    // decimal pixel tearing and encoding failures.
     canvas.width = Math.floor(sWidth / 2) * 2;
     canvas.height = Math.floor(sHeight / 2) * 2;
-    
-    console.log(`Canvas dimensions set to: ${canvas.width} x ${canvas.height}`);
-    console.log(`Capturing from x=${sx} to x=${video.videoWidth}, width=${sWidth}`);
+    // --------------------------------------------------------------------
 
     croppedChunksRef.current = [];
     originalChunksRef.current = [];
 
-    // NOW capture the stream (it will lock to the correct dimensions)
+    // NOW capture the stream (it will lock to the correct 1024x288 resolution)
     const canvasStream = canvas.captureStream(30);
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
 
-    // Create cropped recorder
     const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
     croppedRecorderRef.current = croppedRecorder;
 
@@ -250,7 +271,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       if (e.data.size > 0) croppedChunksRef.current.push(e.data);
     };
 
-    // Create original recorder
     const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
     originalRecorderRef.current = originalRecorder;
 
@@ -258,35 +278,34 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       if (e.data.size > 0) originalChunksRef.current.push(e.data);
     };
 
-    // Handle completion
-    let croppedStopped = false;
-    let originalStopped = false;
+    // --- MISSING LOGIC ADDED HERE: Process videos when recording stops ---
+    let croppedReady = false;
+    let originalReady = false;
 
-    const finalizeCapture = () => {
-      if (croppedStopped && originalStopped) {
-        console.log('Both recorders stopped, creating blobs...');
-        const croppedBlob = new Blob(croppedChunksRef.current, { type: 'video/webm' });
-        const originalBlob = new Blob(originalChunksRef.current, { type: 'video/webm' });
+    const processVideos = () => {
+      if (croppedReady && originalReady) {
+        const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
+        const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
+
         const croppedUrl = URL.createObjectURL(croppedBlob);
         const originalUrl = URL.createObjectURL(originalBlob);
-        setRecordingComplete(true);
-        setTimeout(() => onCapture(croppedUrl, originalUrl), 800);
+
+        // Pass the generated video URLs back to the Home screen
+        onCapture(croppedUrl, originalUrl);
       }
     };
 
     croppedRecorder.onstop = () => {
-      console.log('Cropped recorder stopped');
-      croppedStopped = true;
-      finalizeCapture();
+      croppedReady = true;
+      processVideos();
     };
 
     originalRecorder.onstop = () => {
-      console.log('Original recorder stopped');
-      originalStopped = true;
-      finalizeCapture();
+      originalReady = true;
+      processVideos();
     };
+    // ----------------------------------------------------------------------
 
-    // Start both recorders
     croppedRecorder.start(1000);
     originalRecorder.start(1000);
 
@@ -296,8 +315,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       setRecordingDuration(prev => prev + 1);
     }, 1000);
 
-    // Update state last and start drawing
+    // Update state last
     setIsRecording(true);
+
+    // Start drawing manually since state update is delayed
     drawToCanvas();
   };
 
@@ -306,6 +327,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
     console.log('Stopping both recorders at the same time...');
 
+    // Get the actual recording duration
     const actualDuration = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
     console.log(`Actual recording duration: ${actualDuration} seconds`);
 
