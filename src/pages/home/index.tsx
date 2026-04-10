@@ -117,7 +117,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
     // ADJUST THESE VALUES TO FIT THE TYRE PERFECTLY
     const leftTrimPercent = 0.20;   // Trim 20% from LEFT (reduce this to show more on left)
-    const rightTrimPercent = 0.95;  // Keep up to 80% from left (trim 20% from right)
+    const rightTrimPercent = 1;  // Keep up to 80% from left (trim 20% from right)
     const topStartPct = 0.20;       // Vertical start position
     const heightPct = 0.30;         // Height of the recording strip
 
