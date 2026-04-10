@@ -11,7 +11,7 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
-const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose }) => {
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const croppedRecorderRef = useRef<MediaRecorder | null>(null);
@@ -257,7 +257,33 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose }) => {
       if (e.data.size > 0) originalChunksRef.current.push(e.data);
     };
 
-    // ... (keep your existing finalizeCapture and onstop logic here) ...
+    // --- MISSING LOGIC ADDED HERE: Process videos when recording stops ---
+    let croppedReady = false;
+    let originalReady = false;
+
+    const processVideos = () => {
+      if (croppedReady && originalReady) {
+        const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
+        const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
+
+        const croppedUrl = URL.createObjectURL(croppedBlob);
+        const originalUrl = URL.createObjectURL(originalBlob);
+
+        // Pass the generated video URLs back to the Home screen
+        onCapture(croppedUrl, originalUrl);
+      }
+    };
+
+    croppedRecorder.onstop = () => {
+      croppedReady = true;
+      processVideos();
+    };
+
+    originalRecorder.onstop = () => {
+      originalReady = true;
+      processVideos();
+    };
+    // ----------------------------------------------------------------------
 
     croppedRecorder.start(1000);
     originalRecorder.start(1000);
