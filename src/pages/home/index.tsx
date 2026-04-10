@@ -107,7 +107,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => 
   // ─── CROP LOGIC - Start with NO right trim, then adjust ────────────────────
   // ─── SIMPLE CROP LOGIC - Capture from left trim to full right edge ─────
   const drawToCanvas = () => {
-    if (!canvasRef.current || !videoRef.current || !isRecording) return;
+    if (!canvasRef.current || !videoRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -118,23 +118,24 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => 
       return;
     }
 
-    // Define the Source (The portion of the camera feed we want)
+    // --- FIX 2: Rely on the canvas dimensions set in startRecording ---
     const leftTrimPercent = 0.20;
     const topStartPct = 0.20;
 
     const sx = video.videoWidth * leftTrimPercent;
     const sy = video.videoHeight * topStartPct;
 
-    // Use the same math as startRecording to ensure 100% width coverage
-    const sWidth = video.videoWidth - sx;
-    const sHeight = video.videoHeight * 0.30; // Matches heightPct in startRecording
-
-    // DRAWING LOGIC:
-    // ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+    // Draw using the pre-calculated canvas width/height
     ctx.drawImage(
       video,
-      sx, sy, sWidth, sHeight,      // SOURCE: Crop from the video
-      0, 0, canvas.width, canvas.height // DESTINATION: Fill the canvas exactly
+      sx,
+      sy,
+      canvas.width,
+      canvas.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height
     );
 
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
@@ -212,78 +213,78 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => 
   }, [onClose]);
 
   const startRecording = () => {
-    if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current || !videoRef.current) return;
+  if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current || !videoRef.current) return;
 
-    setShowEndFrame(false);
+  setShowEndFrame(false);
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
 
-    // --- CROP PARAMETERS ---
-    const leftTrimPercent = 0.20; // Start at 20%
-    const heightPct = 0.30;       // 30% tall slice
+  // --- CROP PARAMETERS ---
+  const leftTrimPercent = 0.20; // Start at 20%
+  const heightPct = 0.30;       // 30% tall slice
 
-    // sx is our starting point on the X axis
-    const sx = video.videoWidth * leftTrimPercent;
+  // sx is our starting point on the X axis
+  const sx = video.videoWidth * leftTrimPercent;
+  
+  // Calculate width to reach the ABSOLUTE right edge (100% width)
+  // video.videoWidth - sx gives us every pixel remaining to the right
+  const sWidth = video.videoWidth - sx;
+  const sHeight = video.videoHeight * heightPct;
 
-    // Calculate width to reach the ABSOLUTE right edge (100% width)
-    // video.videoWidth - sx gives us every pixel remaining to the right
-    const sWidth = video.videoWidth - sx;
-    const sHeight = video.videoHeight * heightPct;
+  // VP8/WebM encoders prefer even numbers for dimensions.
+  // We set the canvas size once here and do NOT change it during the loop.
+  canvas.width = Math.floor(sWidth / 2) * 2;
+  canvas.height = Math.floor(sHeight / 2) * 2;
 
-    // VP8/WebM encoders prefer even numbers for dimensions.
-    // We set the canvas size once here and do NOT change it during the loop.
-    canvas.width = Math.floor(sWidth / 2) * 2;
-    canvas.height = Math.floor(sHeight / 2) * 2;
+  croppedChunksRef.current = [];
+  originalChunksRef.current = [];
 
-    croppedChunksRef.current = [];
-    originalChunksRef.current = [];
+  const canvasStream = canvas.captureStream(30);
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+    ? 'video/webm;codecs=vp8'
+    : 'video/webm';
 
-    const canvasStream = canvas.captureStream(30);
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-      ? 'video/webm;codecs=vp8'
-      : 'video/webm';
+  const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
+  croppedRecorderRef.current = croppedRecorder;
 
-    const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
-    croppedRecorderRef.current = croppedRecorder;
-
-    croppedRecorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data.size > 0) croppedChunksRef.current.push(e.data);
-    };
-
-    const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
-    originalRecorderRef.current = originalRecorder;
-
-    originalRecorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data.size > 0) originalChunksRef.current.push(e.data);
-    };
-
-    let croppedReady = false;
-    let originalReady = false;
-
-    const processVideos = () => {
-      if (croppedReady && originalReady) {
-        const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
-        const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
-        onCapture(URL.createObjectURL(croppedBlob), URL.createObjectURL(originalBlob));
-      }
-    };
-
-    croppedRecorder.onstop = () => { croppedReady = true; processVideos(); };
-    originalRecorder.onstop = () => { originalReady = true; processVideos(); };
-
-    croppedRecorder.start(1000);
-    originalRecorder.start(1000);
-
-    recordingStartTimeRef.current = Date.now();
-    setRecordingDuration(0);
-    durationIntervalRef.current = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-    }, 1000);
-
-    setIsRecording(true);
-    drawToCanvas();
+  croppedRecorder.ondataavailable = (e: BlobEvent) => {
+    if (e.data.size > 0) croppedChunksRef.current.push(e.data);
   };
+
+  const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
+  originalRecorderRef.current = originalRecorder;
+
+  originalRecorder.ondataavailable = (e: BlobEvent) => {
+    if (e.data.size > 0) originalChunksRef.current.push(e.data);
+  };
+
+  let croppedReady = false;
+  let originalReady = false;
+
+  const processVideos = () => {
+    if (croppedReady && originalReady) {
+      const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
+      const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
+      onCapture(URL.createObjectURL(croppedBlob), URL.createObjectURL(originalBlob));
+    }
+  };
+
+  croppedRecorder.onstop = () => { croppedReady = true; processVideos(); };
+  originalRecorder.onstop = () => { originalReady = true; processVideos(); };
+
+  croppedRecorder.start(1000);
+  originalRecorder.start(1000);
+
+  recordingStartTimeRef.current = Date.now();
+  setRecordingDuration(0);
+  durationIntervalRef.current = setInterval(() => {
+    setRecordingDuration(prev => prev + 1);
+  }, 1000);
+
+  setIsRecording(true);
+  drawToCanvas();
+};
 
   const stopRecording = () => {
     if (!isRecording) return;
