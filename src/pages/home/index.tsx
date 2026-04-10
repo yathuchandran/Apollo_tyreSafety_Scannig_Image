@@ -234,18 +234,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onClose, onCapture }) => 
     // canvas.height = Math.floor(sHeight / 2) * 2;
     // --------------------------------------------------------------------
     // --- FIX 1: Set dimensions synchronously BEFORE starting the stream ---
-    const leftTrimPercent = 0.20;   // Start capturing at 20% from the left
-    
-    // NEW: Adjust this value to trim the right side!
-    // 0.80 means it STOPS capturing at 80% of the screen (trimming 20% off the right)
-    // 0.70 means it STOPS capturing at 70% of the screen (trimming 30% off the right)
-    const rightTrimPercent = 0.80;  
-    
-    const heightPct = 0.30;
+    const leftTrimPercent = 0.20;  // Starts at 20% from the left edge
+    const rightTrimPercent = 0.95; // Ends at 95% of the right edge (Adjust this!)
+    const heightPct = 0.30;        // Captures 30% of the vertical height
 
     const sx = video.videoWidth * leftTrimPercent;
     
-    // NEW: Calculate width based on the right end point, minus our starting point
+    // Calculate total width by finding the exact right edge coordinate 
+    // and subtracting the starting x coordinate.
     const sWidth = (video.videoWidth * rightTrimPercent) - sx;
     const sHeight = video.videoHeight * heightPct;
 
