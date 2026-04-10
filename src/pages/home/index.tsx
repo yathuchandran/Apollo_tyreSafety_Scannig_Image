@@ -105,37 +105,37 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   // ─── SYMMETRICAL CROP LOGIC - ADJUSTABLE ────────────────────────────────────
   // ─── DYNAMIC CROP LOGIC - Changes based on recording phase ────────────────────
   // ─── CROP LOGIC - Start with NO right trim, then adjust ────────────────────
-const drawToCanvas = () => {
-  if (!canvasRef.current || !videoRef.current || !isRecording) return;
+  // ─── SIMPLE CROP LOGIC - Capture from left trim to full right edge ─────
+  const drawToCanvas = () => {
+    if (!canvasRef.current || !videoRef.current || !isRecording) return;
 
-  const video = videoRef.current;
-  const canvas = canvasRef.current;
-  const ctx = canvas.getContext('2d', { alpha: false });
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d', { alpha: false });
 
-  if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
+    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
+      animationFrameRef.current = requestAnimationFrame(drawToCanvas);
+      return;
+    }
+
+    // Capture from 20% from left ALL THE WAY to the right edge
+    const leftTrimPercent = 0.20;
+    const topStartPct = 0.20;
+    const heightPct = 0.30;
+
+    // Calculate source rectangle - Use videoWidth directly for full width
+    const sx = video.videoWidth * leftTrimPercent;
+    const sy = video.videoHeight * topStartPct;
+    const sWidth = video.videoWidth - sx;  // This captures everything to the right edge
+    const sHeight = video.videoHeight * heightPct;
+
+    canvas.width = Math.max(sWidth, 1);
+    canvas.height = Math.max(sHeight, 1);
+
+    ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
-    return;
-  }
-
-  // START WITH MINIMAL CROPPING - Adjust these values slowly
-  const leftTrimPercent = 0.20;   // Trim 20% from LEFT (START frame position)
-  const rightTrimPercent = 1.0;   // NO trim from RIGHT (capture full width to edge)
-  const topStartPct = 0.20;       // Vertical start position
-  const heightPct = 0.30;         // Height of the recording strip
-
-  // Calculate source rectangle
-  const sx = video.videoWidth * leftTrimPercent;
-  const sy = video.videoHeight * topStartPct;
-  const sWidth = (video.videoWidth * rightTrimPercent) - sx;
-  const sHeight = video.videoHeight * heightPct;
-
-  canvas.width = Math.max(sWidth, 1);
-  canvas.height = Math.max(sHeight, 1);
-
-  ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
-
-  animationFrameRef.current = requestAnimationFrame(drawToCanvas);
-};
+  };
 
   // Start canvas drawing when recording begins
   useEffect(() => {
