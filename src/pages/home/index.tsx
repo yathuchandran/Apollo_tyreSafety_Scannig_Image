@@ -103,38 +103,37 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   // ─── CROP LOGIC - Records from START to END continuously ───────────────────
   const drawToCanvas = () => {
     if (!canvasRef.current || !videoRef.current || !isRecording) return;
-    
+
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { alpha: false });
-    
+
     if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
       animationFrameRef.current = requestAnimationFrame(drawToCanvas);
       return;
     }
 
-    // These values define the recording area from LEFT frame to RIGHT frame
-    const leftStartPct = 0.35;  // START frame position (left)
-    const rightEndPct = 0.65;   // END frame position (right)
-    const topStartPct = 0.20;   // Vertical start position
-    const heightPct = 0.30;     // Height of the recording strip
+    // SYMMETRICAL CROP VALUES - Same amount trimmed from both sides
+    const trimPercent = 0.35;      // Trim 35% from LEFT and 35% from RIGHT
+    const topStartPct = 0.20;      // Vertical start position
+    const heightPct = 0.30;        // Height of the recording strip
 
-    // Calculate source rectangle - ALWAYS captures from START to END
-    const sx = video.videoWidth * leftStartPct;
+    // Calculate source rectangle - TRIM EQUALLY FROM BOTH SIDES
+    const sx = video.videoWidth * trimPercent;           // Start at 35% from left
     const sy = video.videoHeight * topStartPct;
-    const sWidth = (video.videoWidth * rightEndPct) - sx;
+    const sWidth = video.videoWidth * (1 - (trimPercent * 2));  // Width = 100% - 35% - 35% = 30%
     const sHeight = video.videoHeight * heightPct;
 
     // Set canvas resolution to match the cropped area
     canvas.width = Math.max(sWidth, 1);
     canvas.height = Math.max(sHeight, 1);
-    
+
     ctx.drawImage(
       video,
       sx, sy, sWidth, sHeight,
       0, 0, sWidth, sHeight
     );
-    
+
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
   };
 
@@ -225,7 +224,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
       ? 'video/webm;codecs=vp8'
       : 'video/webm';
-    
+
     const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
     croppedRecorderRef.current = croppedRecorder;
 
@@ -269,7 +268,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     // Start both recorders
     croppedRecorder.start(1000);
     originalRecorder.start(1000);
-    
+
     setRecordingDuration(0);
     durationIntervalRef.current = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
@@ -278,7 +277,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const stopRecording = () => {
     if (!isRecording) return;
-    
+
     // Stop BOTH recorders
     if (croppedRecorderRef.current && croppedRecorderRef.current.state === 'recording') {
       croppedRecorderRef.current.stop();
@@ -286,11 +285,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     if (originalRecorderRef.current && originalRecorderRef.current.state === 'recording') {
       originalRecorderRef.current.stop();
     }
-    
+
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     setIsRecording(false);
     setShowEndFrame(false);
-    
+
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
       durationIntervalRef.current = null;
@@ -1322,12 +1321,12 @@ const Home: React.FC = () => {
               <span style={{ padding: '2px 10px', borderRadius: 20, background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)', color: '#00d47a', fontSize: 11 }}>{capturedVideos.length}</span>
             </div>
             {capturedVideos.map((video, i) => (
-              <div key={i} style={{ 
-                background: 'rgba(255,255,255,0.03)', 
-                border: '1px solid rgba(255,255,255,0.07)', 
-                borderRadius: 14, 
-                padding: 12, 
-                marginBottom: 16 
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 14,
+                padding: 12,
+                marginBottom: 16
               }}>
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1408,9 +1407,9 @@ const Home: React.FC = () => {
       )}
       {stage === 'camera' && (
         <CameraCapture
-          onCapture={(croppedUrl: string, originalUrl: string) => { 
-            setCapturedVideos((p) => [{ cropped: croppedUrl, original: originalUrl }, ...p]); 
-            setStage('home'); 
+          onCapture={(croppedUrl: string, originalUrl: string) => {
+            setCapturedVideos((p) => [{ cropped: croppedUrl, original: originalUrl }, ...p]);
+            setStage('home');
           }}
           onClose={() => setStage('home')}
         />
