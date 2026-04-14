@@ -26,7 +26,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
-  const [recordingComplete, setRecordingComplete] = useState<boolean>(false);
+  const [recordingComplete] = useState<boolean>(false);
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
@@ -108,33 +108,41 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
     }
   }, [recordingDuration, isRecording]);
 
-  // ─── SYMMETRICAL CROP LOGIC ────────────────────────────────────────────────
+  // ─── SYMMETRICAL CROP LOGIC - ADJUSTABLE ────────────────────────────────────
+  // ─── DYNAMIC CROP LOGIC - Changes based on recording phase ────────────────────
+  // ─── CROP LOGIC - Start with NO right trim, then adjust ────────────────────
+  // ─── SIMPLE CROP LOGIC - Capture from left trim to full right edge ─────
   const drawToCanvas = () => {
-    if (!canvasRef.current || !videoRef.current || !isRecording) return;
+    if (!canvasRef.current || !videoRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { alpha: false });
 
-    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
+    if (!ctx || video.videoWidth === 0) {
       animationFrameRef.current = requestAnimationFrame(drawToCanvas);
       return;
     }
 
-    // SYMMETRICAL CROP - Same amount trimmed from both sides
-    const trimPercent = 0.35;      // Trim 35% from LEFT and 35% from RIGHT
-    const topStartPct = 0.20;      // Vertical start position
-    const heightPct = 0.30;        // Height of the recording strip
+    // --- FIX 2: Rely on the canvas dimensions set in startRecording ---
+    const leftTrimPercent = 0.20;
+    const topStartPct = 0.20;
 
-    const sx = video.videoWidth * trimPercent;
+    const sx = video.videoWidth * leftTrimPercent;
     const sy = video.videoHeight * topStartPct;
-    const sWidth = video.videoWidth * (1 - (trimPercent * 2));
-    const sHeight = video.videoHeight * heightPct;
 
-    canvas.width = Math.max(sWidth, 1);
-    canvas.height = Math.max(sHeight, 1);
-
-    ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+    // Draw using the pre-calculated canvas width/height
+    ctx.drawImage(
+      video,
+      sx,
+      sy,
+      canvas.width,
+      canvas.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
 
     animationFrameRef.current = requestAnimationFrame(drawToCanvas);
   };
@@ -211,76 +219,78 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
   }, [onClose]);
 
   const startRecording = () => {
-    if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current) return;
+  if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current || !videoRef.current) return;
 
-    setShowEndFrame(false);
-    setIsRecording(true);
+  setShowEndFrame(false);
 
-    croppedChunksRef.current = [];
-    originalChunksRef.current = [];
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
 
-    // Start drawing to canvas
-    drawToCanvas();
+  // --- CROP PARAMETERS ---
+  const leftTrimPercent = 0.20; // Start at 20%
+  const heightPct = 0.30;       // 30% tall slice
 
-    const canvasStream = canvasRef.current.captureStream(30);
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-      ? 'video/webm;codecs=vp8'
-      : 'video/webm';
+  // sx is our starting point on the X axis
+  const sx = video.videoWidth * leftTrimPercent;
+  
+  // Calculate width to reach the ABSOLUTE right edge (100% width)
+  // video.videoWidth - sx gives us every pixel remaining to the right
+  const sWidth = video.videoWidth - sx;
+  const sHeight = video.videoHeight * heightPct;
 
-    // Create cropped recorder
-    const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
-    croppedRecorderRef.current = croppedRecorder;
+  // VP8/WebM encoders prefer even numbers for dimensions.
+  // We set the canvas size once here and do NOT change it during the loop.
+  canvas.width = Math.floor(sWidth / 2) * 2;
+  canvas.height = Math.floor(sHeight / 2) * 2;
 
-    croppedRecorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data.size > 0) croppedChunksRef.current.push(e.data);
-    };
+  croppedChunksRef.current = [];
+  originalChunksRef.current = [];
 
-    // Create original recorder
-    const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
-    originalRecorderRef.current = originalRecorder;
+  const canvasStream = canvas.captureStream(30);
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+    ? 'video/webm;codecs=vp8'
+    : 'video/webm';
 
-    originalRecorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data.size > 0) originalChunksRef.current.push(e.data);
-    };
+  const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
+  croppedRecorderRef.current = croppedRecorder;
 
-    // Handle completion
-    let croppedStopped = false;
-    let originalStopped = false;
-
-    const finalizeCapture = () => {
-      if (croppedStopped && originalStopped) {
-        console.log('Both recorders stopped, creating blobs...');
-        const croppedBlob = new Blob(croppedChunksRef.current, { type: 'video/webm' });
-        const originalBlob = new Blob(originalChunksRef.current, { type: 'video/webm' });
-        const croppedUrl = URL.createObjectURL(croppedBlob);
-        const originalUrl = URL.createObjectURL(originalBlob);
-        setRecordingComplete(true);
-        setTimeout(() => onCapture(croppedUrl, originalUrl), 800);
-      }
-    };
-
-    croppedRecorder.onstop = () => {
-      console.log('Cropped recorder stopped');
-      croppedStopped = true;
-      finalizeCapture();
-    };
-
-    originalRecorder.onstop = () => {
-      console.log('Original recorder stopped');
-      originalStopped = true;
-      finalizeCapture();
-    };
-
-    // Start both recorders
-    croppedRecorder.start(1000);
-    originalRecorder.start(1000);
-
-    recordingStartTimeRef.current = Date.now();
-    setRecordingDuration(0);
-    durationIntervalRef.current = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-    }, 1000);
+  croppedRecorder.ondataavailable = (e: BlobEvent) => {
+    if (e.data.size > 0) croppedChunksRef.current.push(e.data);
   };
+
+  const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
+  originalRecorderRef.current = originalRecorder;
+
+  originalRecorder.ondataavailable = (e: BlobEvent) => {
+    if (e.data.size > 0) originalChunksRef.current.push(e.data);
+  };
+
+  let croppedReady = false;
+  let originalReady = false;
+
+  const processVideos = () => {
+    if (croppedReady && originalReady) {
+      const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
+      const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
+      onCapture(URL.createObjectURL(croppedBlob), URL.createObjectURL(originalBlob));
+    }
+  };
+
+  croppedRecorder.onstop = () => { croppedReady = true; processVideos(); };
+  originalRecorder.onstop = () => { originalReady = true; processVideos(); };
+
+  croppedRecorder.start(1000);
+  originalRecorder.start(1000);
+
+  recordingStartTimeRef.current = Date.now();
+  setRecordingDuration(0);
+  durationIntervalRef.current = setInterval(() => {
+    setRecordingDuration(prev => prev + 1);
+  }, 1000);
+
+  setIsRecording(true);
+  drawToCanvas();
+};
 
   const stopRecording = () => {
     if (!isRecording) return;
@@ -1508,6 +1518,16 @@ const Home: React.FC = () => {
   const [capturedVideos, setCapturedVideos] = useState<Array<{ cropped: string; original: string }>>([]);
   const [capturedPhotos, setCapturedPhotos] = useState<Array<{ url: string; type: 'tread' | 'sidewall'; timestamp: number }>>([]);
 
+  // Helper function to download a video from a URL
+  const downloadVideo = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
     <div style={{
       minHeight: '100vh', background: '#080c10',
@@ -1621,46 +1641,96 @@ const Home: React.FC = () => {
                 padding: 12,
                 marginBottom: 16
               }}>
-                <div style={{ marginBottom: 12 }}>
+                {/* CROPPED VERSION SECTION */}
+                <div style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ color: '#00d47a', fontSize: 11, fontWeight: 600 }}>CROPPED VERSION</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Selective Area</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: '#00d47a', fontSize: 11, fontWeight: 600 }}>CROPPED VERSION</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,212,122,0.08)', color: '#00d47a', fontSize: 10 }}>Selective Area</span>
+                    </div>
+                    <button
+                      onClick={() => downloadVideo(video.cropped, `tread_scan_cropped_${Date.now()}.webm`)}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 6,
+                        background: 'rgba(0,212,122,0.1)',
+                        border: '1px solid rgba(0,212,122,0.25)',
+                        color: '#00d47a',
+                        fontSize: 11,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Download Cropped
+                    </button>
                   </div>
                   <video src={video.cropped} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 </div>
+
+                {/* ORIGINAL VERSION SECTION */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600 }}>ORIGINAL (UNCUT)</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>Full Frame</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600 }}>ORIGINAL (UNCUT)</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>Full Frame</span>
+                    </div>
+                    <button
+                      onClick={() => downloadVideo(video.original, `tread_scan_original_${Date.now()}.webm`)}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 6,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        color: 'rgba(255,255,255,0.6)',
+                        fontSize: 11,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Download Original
+                    </button>
                   </div>
                   <video src={video.original} controls style={{ width: '100%', borderRadius: 8, display: 'block' }} />
                 </div>
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                   <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>Scan #{capturedVideos.length - i}</span>
                   <button
                     onClick={() => {
-                      const a = document.createElement('a');
-                      a.href = video.cropped;
-                      a.download = `tread_scan_cropped_${Date.now()}.webm`;
-                      a.click();
+                      downloadVideo(video.cropped, `tread_scan_cropped_${Date.now()}.webm`);
                       setTimeout(() => {
-                        const b = document.createElement('a');
-                        b.href = video.original;
-                        b.download = `tread_scan_original_${Date.now()}.webm`;
-                        b.click();
-                      }, 500);
+                        downloadVideo(video.original, `tread_scan_original_${Date.now()}.webm`);
+                      }, 150);
                     }}
                     style={{
-                      padding: '4px 12px',
-                      borderRadius: 6,
-                      background: 'rgba(0,212,122,0.1)',
-                      border: '1px solid rgba(0,212,122,0.2)',
+                      padding: '5px 14px',
+                      borderRadius: 20,
+                      background: 'linear-gradient(135deg, rgba(0,212,122,0.15), rgba(0,212,122,0.05))',
+                      border: '1px solid rgba(0,212,122,0.3)',
                       color: '#00d47a',
                       fontSize: 10,
+                      fontWeight: 600,
                       cursor: 'pointer',
+                      letterSpacing: '0.3px',
                     }}
                   >
-                    Download Both
+                    Download Both Videos
                   </button>
                 </div>
               </div>
