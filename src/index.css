@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  @keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    5%, 95% { opacity: 0.6; }
+    50% { top: 100%; }
+    100% { top: 0%; opacity: 0; }
+  }
+  .animate-scan {
+    position: absolute;
+    animation: scan 4s linear infinite;
+  }
+
+  @keyframes bounce-subtle {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, -8px); }
+  }
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2.5s ease-in-out infinite;
+  }
+
+  @keyframes bounce-subtle-reverse {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, 8px); }
+  }
+  .animate-bounce-subtle-reverse {
+    animation: bounce-subtle-reverse 2.5s ease-in-out infinite;
+  }
+}
+
 /* Hide scrollbar */
 .scrollbar-hidden {
   scrollbar-width: none; /* Firefox */

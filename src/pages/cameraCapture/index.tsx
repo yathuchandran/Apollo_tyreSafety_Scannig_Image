@@ -80,9 +80,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-50 overflow-hidden flex flex-col">
-      {/* Video Feed */}
-      <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 bg-black z-50 overflow-hidden">
+      {/* Video Feed - Truly full screen */}
+      <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
         <video
           ref={videoRef}
           autoPlay
@@ -96,62 +96,78 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
         {/* Framing Overlays */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          {/* Dimmed background overlay */}
-          <div className="absolute inset-0 bg-black/40" />
+          {/* Advanced Glassmorphism Overlay */}
+          <div className={`absolute inset-0 transition-all duration-700 backdrop-blur-[1px] ${
+            captureMode === 'tread' ? 'bg-black/5' : 'bg-black/40'
+          }`} />
           
-          {/* Mode-specific Frame */}
-          <div className="relative z-10 w-[85%] max-w-[500px] aspect-[4/3] flex items-center justify-center">
+          {/* Mode-specific Frame Container */}
+          <div className="relative z-10 w-full h-full flex items-center justify-center p-2">
             {captureMode === 'tread' ? (
-              /* Tread Frame: Vertical focus */
-              <div className="relative w-[60%] h-[90%] border-2 border-dashed border-green-500 rounded-lg shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+              /* Tread Frame: Maximum screen fit with scanning effect */
+              <div className="relative w-full h-full border-[12px] border-dashed border-green-500 shadow-[inset_0_0_250px_rgba(34,197,94,0.4)] overflow-hidden rounded-xl">
+                {/* Dynamic Scanning Line */}
+                <div className="absolute inset-x-0 h-1.5 bg-gradient-to-r from-transparent via-green-400 to-transparent shadow-[0_0_30px_rgba(74,222,128,1)] animate-scan opacity-90" />
+
                 {/* Horizontal Tread Line Guides */}
-                <div className="absolute inset-0 flex flex-col justify-around opacity-40">
-                  <div className="w-full h-[1px] bg-green-400" />
-                  <div className="w-full h-[1px] bg-green-400" />
-                  <div className="w-full h-[1px] bg-green-400" />
-                  <div className="w-full h-[1px] bg-green-400" />
+                <div className="absolute inset-0 flex flex-col justify-around opacity-50">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="w-full h-[3px] bg-green-400/70" />
+                  ))}
                 </div>
-                {/* Center crosshair */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center">
-                  <div className="w-full h-[2px] bg-green-500 absolute" />
-                  <div className="w-[2px] h-full bg-green-500 absolute" />
+
+                {/* Center Crosshair with Pulse */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 flex items-center justify-center">
+                  <div className="absolute inset-0 border-4 border-green-500 rounded-full animate-ping opacity-30" />
+                  <div className="w-full h-[4px] bg-green-500 absolute" />
+                  <div className="w-[4px] h-full bg-green-500 absolute" />
                 </div>
-                {/* Corner Accents */}
-                <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-green-400" />
-                <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-green-400" />
-                <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-green-400" />
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-green-400" />
+
+                {/* Premium Corner Accents - true corners */}
+                <div className="absolute top-0 left-0 w-48 h-48 border-t-[16px] border-l-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-tl-lg" />
+                <div className="absolute top-0 right-0 w-48 h-48 border-t-[16px] border-r-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-tr-lg" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 border-b-[16px] border-l-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-bl-lg" />
+                <div className="absolute bottom-0 right-0 w-48 h-48 border-b-[16px] border-r-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-br-lg" />
               </div>
             ) : (
-              /* Sidewall Frame: Circular focus */
-              <div className="relative w-full aspect-square border-2 border-dashed border-blue-400 rounded-full shadow-[0_0_20px_rgba(96,165,250,0.3)]">
+              /* Sidewall Frame: Maximum diameter circle with glowing focus */
+              <div className="relative w-[98vmin] h-[98vmin] border-[6px] border-dashed border-blue-400 rounded-full shadow-[0_0_200px_rgba(96,165,250,0.6)] bg-blue-500/5 backdrop-blur-[2px] flex items-center justify-center">
+                {/* Focus Ring Animation */}
+                <div className="absolute inset-0 border-[8px] border-blue-400 rounded-full animate-pulse opacity-50" />
+                
                 {/* Inner circle guide */}
-                <div className="absolute inset-[15%] border border-blue-300 rounded-full opacity-50" />
+                <div className="absolute inset-[12%] border-2 border-blue-300/40 rounded-full border-dotted" />
+                
                 {/* Center crosshair */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center">
-                  <div className="w-full h-[2px] bg-blue-400 absolute" />
-                  <div className="w-[2px] h-full bg-blue-400 absolute" />
+                <div className="absolute w-40 h-40 flex items-center justify-center">
+                  <div className="w-full h-[5px] bg-blue-400 absolute shadow-[0_0_40px_rgba(96,165,250,1)]" />
+                  <div className="w-[5px] h-full bg-blue-400 absolute shadow-[0_0_40px_rgba(96,165,250,1)]" />
                 </div>
-                {/* Brackets */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 px-3 bg-blue-500 text-[10px] text-white rounded font-bold uppercase tracking-widest">Top</div>
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-4 px-3 bg-blue-500 text-[10px] text-white rounded font-bold uppercase tracking-widest">Bottom</div>
+                
+                {/* Floating Brackets */}
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-12 py-4 bg-blue-600/95 backdrop-blur-md text-[18px] text-white rounded-full font-bold uppercase tracking-widest shadow-2xl border border-blue-400/50 animate-bounce-subtle">
+                  Top
+                </div>
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-12 py-4 bg-blue-600/95 backdrop-blur-md text-[18px] text-white rounded-full font-bold uppercase tracking-widest shadow-2xl border border-blue-400/50 animate-bounce-subtle-reverse">
+                  Bottom
+                </div>
               </div>
             )}
           </div>
 
           {/* Labels and Instructions */}
-          <div className="absolute top-24 left-0 right-0 text-center">
-            <div className="inline-block bg-black/60 backdrop-blur-md px-6 py-2 rounded-full border border-white/20">
-              <p className="text-white text-sm font-medium flex items-center gap-2">
+          <div className="absolute top-10 left-0 right-0 text-center z-30">
+            <div className="inline-block bg-black/40 backdrop-blur-xl px-8 py-3 rounded-full border border-white/20 shadow-2xl">
+              <p className="text-white text-lg font-semibold flex items-center gap-3">
                 {captureMode === 'tread' ? (
                   <>
-                    <Layout className="w-4 h-4 text-green-400" />
-                    Align Tyre Tread within the Green Box
+                    <Layout className="w-6 h-6 text-green-400" />
+                    Align Tyre Tread in Box
                   </>
                 ) : (
                   <>
-                    <Circle className="w-4 h-4 text-blue-400" />
-                    Align Tyre Sidewall within the Blue Circle
+                    <Circle className="w-6 h-6 text-blue-400" />
+                    Align Sidewall in Circle
                   </>
                 )}
               </p>
@@ -165,62 +181,62 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         )}
       </div>
 
-      {/* Control Bar */}
-      <div className="bg-zinc-900 px-6 py-8 pb-10 flex flex-col gap-6">
+      {/* Control Bar Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 z-40 px-6 py-10 pb-12 flex flex-col gap-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent backdrop-blur-[2px]">
         {/* Mode Selector */}
         <div className="flex justify-center">
-          <div className="bg-black/50 p-1 rounded-xl flex gap-1">
+          <div className="bg-white/10 backdrop-blur-2xl p-1.5 rounded-2xl flex gap-1 border border-white/10 shadow-2xl">
             <button
               onClick={() => setCaptureMode('tread')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-8 py-3 rounded-xl transition-all duration-300 ${
                 captureMode === 'tread'
-                  ? 'bg-green-600 text-white shadow-lg'
-                  : 'text-zinc-500 hover:text-white'
+                  ? 'bg-green-600 text-white shadow-[0_0_20px_rgba(34,197,94,0.5)] scale-105'
+                  : 'text-zinc-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Layout className="w-4 h-4" />
-              <span className="text-sm font-bold">Tread</span>
+              <Layout className="w-5 h-5" />
+              <span className="text-base font-bold tracking-tight">Tread</span>
             </button>
             <button
               onClick={() => setCaptureMode('sidewall')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-8 py-3 rounded-xl transition-all duration-300 ${
                 captureMode === 'sidewall'
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'text-zinc-500 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)] scale-105'
+                  : 'text-zinc-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Circle className="w-4 h-4" />
-              <span className="text-sm font-bold">Sidewall</span>
+              <Circle className="w-5 h-5" />
+              <span className="text-base font-bold tracking-tight">Sidewall</span>
             </button>
           </div>
         </div>
 
         {/* Main Actions */}
-        <div className="flex items-center justify-between max-w-sm mx-auto w-full">
+        <div className="flex items-center justify-between max-w-md mx-auto w-full px-4">
           {/* Close */}
           <button
             onClick={onClose}
-            className="p-4 bg-zinc-800 rounded-full text-white hover:bg-zinc-700 transition-colors"
+            className="p-5 bg-white/10 backdrop-blur-xl rounded-full text-white hover:bg-white/20 transition-all border border-white/10 active:scale-95 shadow-xl"
           >
-            <X className="w-6 h-6" />
+            <X className="w-7 h-7" />
           </button>
 
           {/* Capture Button */}
           <button
             onClick={capturePhoto}
             disabled={!isCameraReady || isCapturing}
-            className="group relative p-1"
+            className="group relative p-1.5"
           >
             <div className="absolute inset-0 bg-white/20 rounded-full animate-ping group-active:hidden" />
-            <div className="relative w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-2xl transition-transform active:scale-90 overflow-hidden">
-              <div className="w-[90%] h-[90%] border-4 border-black/10 rounded-full flex items-center justify-center">
-                <Camera className="w-10 h-10 text-zinc-900" />
+            <div className="relative w-28 h-28 bg-white rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(255,255,255,0.3)] transition-all active:scale-90 active:bg-zinc-200 overflow-hidden">
+              <div className="w-[88%] h-[88%] border-[3px] border-black/10 rounded-full flex items-center justify-center">
+                <Camera className="w-12 h-12 text-black" />
               </div>
             </div>
           </button>
 
-          {/* Placeholder/Flip Camera (optional) */}
-          <div className="w-14 h-14" />
+          {/* Placeholder/Extra Option */}
+          <div className="w-16 h-16 opacity-0" />
         </div>
       </div>
     </div>
