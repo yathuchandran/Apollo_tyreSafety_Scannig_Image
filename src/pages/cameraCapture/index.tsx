@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, SwitchCamera, Layout, Circle } from 'lucide-react';
+import { X, Camera, Layout, Circle } from 'lucide-react';
 
 interface CameraCaptureProps {
   onCapture: (imageDataUrl: string) => void;

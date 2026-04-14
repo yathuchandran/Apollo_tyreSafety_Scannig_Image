@@ -32,8 +32,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
 
   // New states for Photo Mode
-  const [captureType, setCaptureType] = useState<'video' | 'photo'>(initialMode === 'video' ? 'video' : 'photo');
-  const [photoSubMode, setPhotoSubMode] = useState<'tread' | 'sidewall'>(initialMode === 'photo_sidewall' ? 'sidewall' : 'tread');
+  const [captureType] = useState<'video' | 'photo'>(initialMode === 'video' ? 'video' : 'photo');
+  const [photoSubMode] = useState<'tread' | 'sidewall'>(initialMode === 'photo_sidewall' ? 'sidewall' : 'tread');
   const [isCapturingPhoto, setIsCapturingPhoto] = useState<boolean>(false);
 
   const durationIntervalRef = useRef<number | null>(null);
