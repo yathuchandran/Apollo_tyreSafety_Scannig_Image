@@ -227,4 +227,4 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   );
 };
 
-export default CameraCapture;
+export default CameraCapture;

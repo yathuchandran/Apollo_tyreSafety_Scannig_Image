@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 
-// ─── CAMERA CAPTURE ──────────────────────────────────────────────────────────
 interface CameraCaptureProps {
+  initialMode: 'video' | 'photo_tread' | 'photo_sidewall';
   onCapture: (croppedVideoUrl: string, originalVideoUrl: string) => void;
   onPhotoCapture: (imageUrl: string, type: 'tread' | 'sidewall') => void;
   onClose: () => void;
@@ -12,7 +12,7 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
-const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture, onClose }) => {
+const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, onPhotoCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const croppedRecorderRef = useRef<MediaRecorder | null>(null);
@@ -32,8 +32,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
 
   // New states for Photo Mode
-  const [captureType, setCaptureType] = useState<'video' | 'photo'>('video');
-  const [photoSubMode, setPhotoSubMode] = useState<'tread' | 'sidewall'>('tread');
+  const [captureType, setCaptureType] = useState<'video' | 'photo'>(initialMode === 'video' ? 'video' : 'photo');
+  const [photoSubMode, setPhotoSubMode] = useState<'tread' | 'sidewall'>(initialMode === 'photo_sidewall' ? 'sidewall' : 'tread');
   const [isCapturingPhoto, setIsCapturingPhoto] = useState<boolean>(false);
 
   const durationIntervalRef = useRef<number | null>(null);
@@ -357,7 +357,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   const progress = Math.min((recordingDuration / 60) * 100, 100);
@@ -705,39 +705,61 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
               </div>
             </div>
           ) : (
-            /* Refined Sidewall PHOTO Frame: Half-Size Top Arc */
+            /* Refined Sidewall PHOTO Frame: 40% Realistic Tyre Arc */
             <div style={{
               width: '100%',
-              height: '60%',
+              height: '70%',
               position: 'relative',
-              marginTop: '-20%', // Shift up to focus on top arc
+              marginTop: '-10%',
             }}>
-              <svg viewBox="0 0 200 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                {/* Main Outer Arch (Matching the provided half-tyre image) */}
+              <svg viewBox="0 0 200 140" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                <defs>
+                  <filter id="glowBlue">
+                    <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                {/* Outer Tyre Ridges (Mimicking sidewall texture) */}
                 <path 
-                  d="M 10 110 A 90 90 0 0 1 190 110" 
+                  d="M 25 105 A 85 85 0 0 1 175 105" 
+                  fill="none" 
+                  stroke="#3b82f6" 
+                  strokeWidth="6" 
+                  strokeDasharray="2 4" 
+                  opacity="0.3"
+                />
+
+                {/* Main 40% Sidewall Focal Arch */}
+                <path 
+                  d="M 25 105 A 85 85 0 0 1 175 105" 
                   fill="none" 
                   stroke="#3b82f6" 
                   strokeWidth="3" 
-                  strokeDasharray="12 6" 
-                  filter="drop-shadow(0 0 8px rgba(59,130,246,0.4))"
+                  strokeDasharray="15 5" 
+                  filter="url(#glowBlue)"
                 />
                 
-                {/* Secondary Inner Arcs for Text Placement */}
-                <path d="M 25 110 A 75 75 0 0 1 175 110" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.6" />
-                <path d="M 40 110 A 60 60 0 0 1 160 110" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.3" strokeDasharray="4 4" />
+                {/* Layered Sidewall Guides (Concentric) */}
+                <path d="M 40 105 A 70 70 0 0 1 160 105" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.6" />
+                <path d="M 55 105 A 55 55 0 0 1 145 105" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.3" strokeDasharray="4 4" />
                 
-                {/* Orientation Label */}
-                <text x="100" y="15" fill="#3b82f6" fontSize="11" fontWeight="800" textAnchor="middle" style={{ opacity: 0.8, letterSpacing: '2px' }}>SIDEWALL ARC</text>
-                
-                {/* Center Focal Point */}
-                <circle cx="100" cy="45" r="5" stroke="#3b82f6" strokeWidth="1.5" fill="none" opacity="0.7" />
-                <line x1="92" y1="45" x2="108" y2="45" stroke="#3b82f6" strokeWidth="1.5" opacity="0.7" />
-                <line x1="100" y1="37" x2="100" y2="53" stroke="#3b82f6" strokeWidth="1.5" opacity="0.7" />
+                {/* Sidewall Ridges / Notches */}
+                <path d="M 30 105 A 80 80 0 0 1 170 105" fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="1 8" opacity="0.5" />
 
-                {/* Vertical Alignment Notches */}
-                <line x1="10" y1="105" x2="10" y2="115" stroke="#3b82f6" strokeWidth="2" />
-                <line x1="190" y1="105" x2="190" y2="115" stroke="#3b82f6" strokeWidth="2" />
+                {/* Orientation & Focal Label */}
+                <text x="100" y="20" fill="#3b82f6" fontSize="9" fontWeight="800" textAnchor="middle" style={{ opacity: 0.8, letterSpacing: '2px' }}>SIDEWALL FOCAL 40%</text>
+                
+                {/* Precision Corner Brackets */}
+                <path d="M 20 100 L 25 105 L 35 105" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <path d="M 180 100 L 175 105 L 165 105" fill="none" stroke="#3b82f6" strokeWidth="2" />
+
+                {/* Center Focal Target */}
+                <circle cx="100" cy="45" r="6" stroke="#3b82f6" strokeWidth="1.5" fill="none" opacity="0.7" />
+                <line x1="90" y1="45" x2="110" y2="45" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
+                <line x1="100" y1="35" x2="100" y2="55" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
               </svg>
 
               <div style={{
@@ -745,7 +767,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
                 background: '#3b82f6', padding: '4px 12px', borderRadius: 6,
                 color: 'white', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap'
               }}>
-                ALIGN TOP SIDEWALL ARC
+                ALIGN SIDEWALL ARC (40%)
               </div>
             </div>
           )}
@@ -1085,84 +1107,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
         zIndex: 10,
       }}>
-        {/* Mode Switcher */}
-        {!isRecording && (
-          <div style={{
-            display: 'flex',
-            background: 'rgba(255,255,255,0.08)',
-            padding: 4,
-            borderRadius: 12,
-            marginBottom: 4,
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <button
-              onClick={() => setCaptureType('video')}
-              style={{
-                padding: '6px 16px',
-                borderRadius: 9,
-                fontSize: 12,
-                fontWeight: 600,
-                border: 'none',
-                cursor: 'pointer',
-                background: captureType === 'video' ? '#00d47a' : 'transparent',
-                color: captureType === 'video' ? '#001a0d' : 'rgba(255,255,255,0.5)',
-                transition: 'all 0.2s'
-              }}
-            >VIDEO</button>
-            <button
-              onClick={() => setCaptureType('photo')}
-              style={{
-                padding: '6px 16px',
-                borderRadius: 9,
-                fontSize: 12,
-                fontWeight: 600,
-                border: 'none',
-                cursor: 'pointer',
-                background: captureType === 'photo' ? '#00d47a' : 'transparent',
-                color: captureType === 'photo' ? '#001a0d' : 'rgba(255,255,255,0.5)',
-                transition: 'all 0.2s'
-              }}
-            >PHOTO</button>
-          </div>
-        )}
-
-        {/* Photo Sub-mode Switcher */}
-        {captureType === 'photo' && (
-          <div style={{
-            display: 'flex',
-            gap: 12,
-            marginBottom: 4
-          }}>
-            <button
-              onClick={() => setPhotoSubMode('tread')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '5px 12px', borderRadius: 20,
-                background: photoSubMode === 'tread' ? 'rgba(0,212,122,0.15)' : 'transparent',
-                border: `1px solid ${photoSubMode === 'tread' ? '#00d47a' : 'rgba(255,255,255,0.2)'}`,
-                color: photoSubMode === 'tread' ? '#00d47a' : 'rgba(255,255,255,0.4)',
-                fontSize: 10, fontWeight: 700, cursor: 'pointer'
-              }}
-            >
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: photoSubMode === 'tread' ? '#00d47a' : 'rgba(255,255,255,0.2)' }} />
-              TREAD
-            </button>
-            <button
-              onClick={() => setPhotoSubMode('sidewall')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '5px 12px', borderRadius: 20,
-                background: photoSubMode === 'sidewall' ? 'rgba(59,130,246,0.15)' : 'transparent',
-                border: `1px solid ${photoSubMode === 'sidewall' ? '#3b82f6' : 'rgba(255,255,255,0.2)'}`,
-                color: photoSubMode === 'sidewall' ? '#3b82f6' : 'rgba(255,255,255,0.4)',
-                fontSize: 10, fontWeight: 700, cursor: 'pointer'
-              }}
-            >
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: photoSubMode === 'sidewall' ? '#3b82f6' : 'rgba(255,255,255,0.2)' }} />
-              SIDEWALL
-            </button>
-          </div>
-        )}
+        {/* Note: Mode Switchers removed as per requirement for separate sections */}
 
         {captureType === 'video' ? (
           /* Video Controls */
@@ -1368,11 +1313,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture
 
 // ─── INSTRUCTIONS PROMPT ─────────────────────────────────────────────────────
 interface InstructionsPromptProps {
+  mode: 'video' | 'photo_tread' | 'photo_sidewall';
   onContinue: () => void;
   onClose: () => void;
 }
 
-const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onClose }) => (
+const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ mode, onContinue, onClose }) => (
   <div style={{
     position: 'fixed',
     inset: 0,
@@ -1448,19 +1394,23 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
-          Selective Tread Recording
+          {mode === 'video' ? 'Selective Tread Recording' : mode === 'photo_tread' ? 'Tread Profile Capture' : 'Sidewall Arc Capture'}
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          Only the tread inside the green frame will be captured — perfect, cropped output
+          {mode === 'video' 
+            ? 'Only the tread inside the green frame will be captured — perfect, cropped output'
+            : mode === 'photo_tread'
+            ? 'Capture high-resolution tread profile with professional arched guides'
+            : 'Capture clear sidewall details using the calibrated tyre arc guide'}
         </p>
       </div>
 
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '◎', label: 'Point rear camera at the tread' },
-          { icon: '▭', label: 'Align tread inside the green frame' },
-          { icon: '✂', label: 'Only the framed area is recorded' },
-          { icon: '●', label: 'Tap scan to start, tap stop when finished' },
+          { icon: mode === 'video' ? '◎' : '📷', label: mode === 'video' ? 'Point rear camera at the tread' : 'Choose Tread or Sidewall mode' },
+          { icon: '▭', label: mode === 'video' ? 'Align tread inside the green frame' : 'Align tyre within professional guides' },
+          { icon: mode === 'video' ? '✂' : '✨', label: mode === 'video' ? 'Only the framed area is recorded' : 'High-resolution still capture' },
+          { icon: '●', label: mode === 'video' ? 'Tap scan to start, tap stop when finished' : 'Tap shutter button to capture photo' },
         ].map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -1515,6 +1465,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 // ─── HOME ────────────────────────────────────────────────────────────────────
 const Home: React.FC = () => {
   const [stage, setStage] = useState<'home' | 'prompt' | 'camera'>('home');
+  const [captureMode, setCaptureMode] = useState<'video' | 'photo_tread' | 'photo_sidewall'>('video');
   const [capturedVideos, setCapturedVideos] = useState<Array<{ cropped: string; original: string }>>([]);
   const [capturedPhotos, setCapturedPhotos] = useState<Array<{ url: string; type: 'tread' | 'sidewall'; timestamp: number }>>([]);
 
@@ -1569,44 +1520,101 @@ const Home: React.FC = () => {
           </p>
         </div>
 
-        <button onClick={() => setStage('prompt')} style={{
-          width: '100%', background: 'none',
-          border: '1px solid rgba(0,212,122,0.2)', borderRadius: 20,
-          padding: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative', marginBottom: 20,
-        }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,212,122,0.08) 0%, rgba(0,100,200,0.04) 100%)' }} />
-          <div style={{ position: 'relative', padding: '34px 32px' }}>
-            <div style={{ marginBottom: 26, display: 'flex', justifyContent: 'center' }}>
-              <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', inset: -12, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.15)', animation: 'ringPulse 2.5s ease-in-out infinite' }} />
-                <div style={{ position: 'absolute', inset: -24, borderRadius: '50%', border: '1px solid rgba(0,212,122,0.07)', animation: 'ringPulse 2.5s ease-in-out infinite 0.5s' }} />
-                <div style={{
-                  width: 68, height: 68, borderRadius: '50%',
-                  background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00d47a" strokeWidth="1.5" strokeLinecap="round">
-                    <path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" />
-                  </svg>
-                </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+          {/* 1. VIDEO SECTION */}
+          <button 
+            onClick={() => {
+              setCaptureMode('video');
+              setStage('prompt');
+            }} 
+            style={{
+              width: '100%', background: 'none',
+              border: '1px solid rgba(0,212,122,0.2)', borderRadius: 20,
+              padding: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative',
+            }}
+          >
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,212,122,0.1) 0%, rgba(0,100,200,0.05) 100%)' }} />
+            <div style={{ position: 'relative', padding: '24px 22px', display: 'flex', alignItems: 'center', gap: 18 }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d47a" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" />
+                </svg>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', letterSpacing: '-0.3px', color: 'white' }}>Start Tyre Scan</h2>
+                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, margin: 0 }}>Selective tread recording (Video)</p>
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, letterSpacing: '0.25em', margin: '0 0 8px', textTransform: 'uppercase' }}>Tap to begin</p>
-              <h2 style={{ fontSize: 21, fontWeight: 600, margin: '0 0 6px', letterSpacing: '-0.4px' }}>Start Tyre Scan</h2>
-              <p style={{ color: 'rgba(255,255,255,0.33)', fontSize: 13, margin: '0 0 22px' }}>Selective frame recording</p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {['Selective capture', 'Cropped output', 'Full tread'].map(f => (
-                  <span key={f} style={{
-                    padding: '4px 12px', borderRadius: 20,
-                    background: 'rgba(0,212,122,0.08)', border: '1px solid rgba(0,212,122,0.15)',
-                    color: 'rgba(0,212,122,0.8)', fontSize: 11, fontWeight: 500,
-                  }}>{f}</span>
-                ))}
+          </button>
+
+          {/* 2. TREAD PHOTO SECTION */}
+          <button 
+            onClick={() => {
+              setCaptureMode('photo_tread');
+              setStage('prompt');
+            }} 
+            style={{
+              width: '100%', background: 'none',
+              border: '1px solid rgba(0,212,122,0.2)', borderRadius: 20,
+              padding: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative',
+            }}
+          >
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,212,122,0.08) 0%, rgba(0,212,122,0.03) 100%)' }} />
+            <div style={{ position: 'relative', padding: '22px 22px', display: 'flex', alignItems: 'center', gap: 18 }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d47a" strokeWidth="1.5" strokeLinecap="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 9v6M9 12h6" />
+                </svg>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', letterSpacing: '-0.3px', color: 'white' }}>Tread Photo Capture</h2>
+                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, margin: 0 }}>Arched tyre profile (Still)</p>
               </div>
             </div>
-          </div>
-        </button>
+          </button>
+
+          {/* 3. SIDEWALL PHOTO SECTION */}
+          <button 
+            onClick={() => {
+              setCaptureMode('photo_sidewall');
+              setStage('prompt');
+            }} 
+            style={{
+              width: '100%', background: 'none',
+              border: '1px solid rgba(59,130,246,0.2)', borderRadius: 20,
+              padding: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative',
+            }}
+          >
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(0,212,122,0.05) 100%)' }} />
+            <div style={{ position: 'relative', padding: '22px 22px', display: 'flex', alignItems: 'center', gap: 18 }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M12 2a10 10 0 0 0-10 10" />
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M19 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', letterSpacing: '-0.3px', color: 'white' }}>Sidewall Photo Capture</h2>
+                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, margin: 0 }}>Tyre side curvature (Still)</p>
+              </div>
+            </div>
+          </button>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 28 }}>
           {[
@@ -1818,12 +1826,14 @@ const Home: React.FC = () => {
 
       {stage === 'prompt' && (
         <InstructionsPrompt
+          mode={captureMode}
           onContinue={() => setStage('camera')}
           onClose={() => setStage('home')}
         />
       )}
       {stage === 'camera' && (
         <CameraCapture
+          initialMode={captureMode}
           onCapture={(croppedUrl: string, originalUrl: string) => {
             setCapturedVideos((p) => [{ cropped: croppedUrl, original: originalUrl }, ...p]);
             setStage('home');
