@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 // ─── CAMERA CAPTURE ──────────────────────────────────────────────────────────
 interface CameraCaptureProps {
   onCapture: (croppedVideoUrl: string, originalVideoUrl: string) => void;
+  onPhotoCapture: (imageUrl: string, type: 'tread' | 'sidewall') => void;
   onClose: () => void;
 }
 
@@ -11,7 +12,7 @@ interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
-const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onPhotoCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const croppedRecorderRef = useRef<MediaRecorder | null>(null);
@@ -29,6 +30,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const [scanPct, setScanPct] = useState<number>(0);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
   const [showEndFrame, setShowEndFrame] = useState<boolean>(false);
+
+  // New states for Photo Mode
+  const [captureType, setCaptureType] = useState<'video' | 'photo'>('video');
+  const [photoSubMode, setPhotoSubMode] = useState<'tread' | 'sidewall'>('tread');
+  const [isCapturingPhoto, setIsCapturingPhoto] = useState<boolean>(false);
 
   const durationIntervalRef = useRef<number | null>(null);
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -307,6 +313,37 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   };
 
+  const capturePhoto = () => {
+    if (!videoRef.current || !isCameraReady) return;
+
+    setIsCapturingPhoto(true);
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    const video = videoRef.current;
+    
+    // Create a temporary canvas for capture
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    if (context) {
+      // Set canvas dimensions to match video stream
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // Draw the current video frame to the canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Get the image as a data URL (JPEG)
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+      // Brief delay for shutter effect
+      setTimeout(() => {
+        onPhotoCapture(imageDataUrl, photoSubMode);
+        setIsCapturingPhoto(false);
+      }, 300);
+    }
+  };
+
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -400,6 +437,17 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         </div>
       </div>
 
+      {/* Capture Shutter Animation */}
+      {isCapturingPhoto && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'white',
+          zIndex: 100,
+          animation: 'shutter 0.3s ease-out'
+        }} />
+      )}
+
       {/* Vignette */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -421,17 +469,19 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         zIndex: 5,
       }} />
 
-      {/* ══ CURVED SCAN FRAME ══ */}
-      <div style={{
-        position: 'absolute',
-        left: '50%',
-        top: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: 'min(82%, calc(100% * 6 / 7 * 0.82))',
-        aspectRatio: '3.7 / 7',
-        pointerEvents: 'none',
-        zIndex: 15,
-      }}>
+      {/* ══ CONDITIONAL FRAMES ══ */}
+      {captureType === 'video' ? (
+        /* Video Scan Frame */
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 'min(82%, calc(100% * 6 / 7 * 0.82))',
+          aspectRatio: '3.7 / 7',
+          pointerEvents: 'none',
+          zIndex: 15,
+        }}>
         <svg
           viewBox="0 0 280 630"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
@@ -586,9 +636,114 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           </span>
         </div>
       </div>
+      ) : (
+        /* Photo Frames */
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '80%',
+          aspectRatio: '1 / 1',
+          pointerEvents: 'none',
+          zIndex: 15,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          {photoSubMode === 'tread' ? (
+            /* Refined Tread PHOTO Frame: Arched Profile with Lines */
+            <div style={{
+              width: '80%',
+              height: '95%',
+              position: 'relative',
+            }}>
+              <svg viewBox="0 0 100 150" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                {/* Tyre Profile Outline */}
+                <path 
+                  d="M 20 2 Q 5 75 20 148 L 80 148 Q 95 75 80 2 Z" 
+                  fill="none" 
+                  stroke="#00d47a" 
+                  strokeWidth="2.5" 
+                  strokeDasharray="6 3"
+                  filter="drop-shadow(0 0 8px rgba(0,212,122,0.4))"
+                />
+                
+                {/* Internal Tread Pattern Lines (As seen in Reference Image 1) */}
+                <line x1="32" y1="8" x2="32" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
+                <line x1="44" y1="8" x2="44" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
+                <line x1="56" y1="8" x2="56" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
+                <line x1="68" y1="8" x2="68" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
+                
+                {/* Horizontal Level Guides */}
+                <line x1="15" y1="30" x2="85" y2="30" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
+                <line x1="15" y1="75" x2="85" y2="75" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
+                <line x1="15" y1="120" x2="85" y2="120" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
+
+                {/* Center Crosshair */}
+                <circle cx="50" cy="75" r="4" stroke="#00d47a" strokeWidth="1" fill="none" />
+                <line x1="45" y1="75" x2="55" y2="75" stroke="#00d47a" strokeWidth="1" />
+                <line x1="50" y1="70" x2="50" y2="80" stroke="#00d47a" strokeWidth="1" />
+              </svg>
+
+              <div style={{
+                position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(0,212,122,0.9)', padding: '4px 12px', borderRadius: 6,
+                color: '#001a0d', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap'
+              }}>
+                ALIGN TREAD IN PROFILE
+              </div>
+            </div>
+          ) : (
+            /* Refined Sidewall PHOTO Frame: Half-Size Top Arc */
+            <div style={{
+              width: '100%',
+              height: '60%',
+              position: 'relative',
+              marginTop: '-20%', // Shift up to focus on top arc
+            }}>
+              <svg viewBox="0 0 200 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                {/* Main Outer Arch (Matching the provided half-tyre image) */}
+                <path 
+                  d="M 10 110 A 90 90 0 0 1 190 110" 
+                  fill="none" 
+                  stroke="#3b82f6" 
+                  strokeWidth="3" 
+                  strokeDasharray="12 6" 
+                  filter="drop-shadow(0 0 8px rgba(59,130,246,0.4))"
+                />
+                
+                {/* Secondary Inner Arcs for Text Placement */}
+                <path d="M 25 110 A 75 75 0 0 1 175 110" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.6" />
+                <path d="M 40 110 A 60 60 0 0 1 160 110" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.3" strokeDasharray="4 4" />
+                
+                {/* Orientation Label */}
+                <text x="100" y="15" fill="#3b82f6" fontSize="11" fontWeight="800" textAnchor="middle" style={{ opacity: 0.8, letterSpacing: '2px' }}>SIDEWALL ARC</text>
+                
+                {/* Center Focal Point */}
+                <circle cx="100" cy="45" r="5" stroke="#3b82f6" strokeWidth="1.5" fill="none" opacity="0.7" />
+                <line x1="92" y1="45" x2="108" y2="45" stroke="#3b82f6" strokeWidth="1.5" opacity="0.7" />
+                <line x1="100" y1="37" x2="100" y2="53" stroke="#3b82f6" strokeWidth="1.5" opacity="0.7" />
+
+                {/* Vertical Alignment Notches */}
+                <line x1="10" y1="105" x2="10" y2="115" stroke="#3b82f6" strokeWidth="2" />
+                <line x1="190" y1="105" x2="190" y2="115" stroke="#3b82f6" strokeWidth="2" />
+              </svg>
+
+              <div style={{
+                position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)',
+                background: '#3b82f6', padding: '4px 12px', borderRadius: 6,
+                color: 'white', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap'
+              }}>
+                ALIGN TOP SIDEWALL ARC
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ══ LEFT SIDE TYRE CURVED EDGE (START FRAME) ══ */}
-      {(!isRecording || (isRecording && !showEndFrame)) && (
+      {captureType === 'video' && (!isRecording || (isRecording && !showEndFrame)) && (
         <div style={{
           position: 'absolute',
           left: 0,
@@ -758,7 +913,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       )}
 
       {/* ══ RIGHT SIDE TYRE CURVED EDGE (END FRAME) ══ */}
-      {(isRecording && showEndFrame) && (
+      {captureType === 'video' && (isRecording && showEndFrame) && (
         <div style={{
           position: 'absolute',
           right: 0,
@@ -920,108 +1075,229 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
         zIndex: 10,
       }}>
-        {!isRecording && isCameraReady && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
-              <div style={{ display: 'flex', gap: 3 }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} style={{
-                    width: 16, height: 2, borderRadius: 1,
-                    background: `rgba(0,212,122,${0.3 + i * 0.3})`,
-                  }} />
-                ))}
-              </div>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Hold steady · Cover full tread</span>
-            </div>
-          </div>
-        )}
-        {isRecording && (
-          <div style={{ width: '100%', maxWidth: 200 }}>
-            <div style={{
-              width: '100%', height: 3, borderRadius: 2,
-              background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 5,
-            }}>
-              <div style={{
-                height: '100%', borderRadius: 2,
-                background: 'linear-gradient(90deg, #00c46e, #00d47a)',
-                width: `${progress}%`, transition: 'width 1s linear',
-              }} />
-            </div>
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-              Recording: {formatDuration(recordingDuration)}
-            </span>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        {/* Mode Switcher */}
+        {!isRecording && (
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '5px 10px', borderRadius: 8,
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+            display: 'flex',
+            background: 'rgba(255,255,255,0.08)',
+            padding: 4,
+            borderRadius: 12,
+            marginBottom: 4,
+            border: '1px solid rgba(255,255,255,0.1)'
           }}>
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>CROP · HD</span>
+            <button
+              onClick={() => setCaptureType('video')}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 9,
+                fontSize: 12,
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                background: captureType === 'video' ? '#00d47a' : 'transparent',
+                color: captureType === 'video' ? '#001a0d' : 'rgba(255,255,255,0.5)',
+                transition: 'all 0.2s'
+              }}
+            >VIDEO</button>
+            <button
+              onClick={() => setCaptureType('photo')}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 9,
+                fontSize: 12,
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                background: captureType === 'photo' ? '#00d47a' : 'transparent',
+                color: captureType === 'photo' ? '#001a0d' : 'rgba(255,255,255,0.5)',
+                transition: 'all 0.2s'
+              }}
+            >PHOTO</button>
           </div>
+        )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            {!isRecording ? (
-              <button
-                onClick={startRecording}
-                disabled={!isCameraReady || recordingComplete}
-                style={{
-                  position: 'relative', background: 'none', border: 'none', padding: 0,
-                  cursor: (!isCameraReady || recordingComplete) ? 'not-allowed' : 'pointer',
-                  opacity: (!isCameraReady || recordingComplete) ? 0.4 : 1,
-                }}
-              >
-                <div style={{
-                  width: 64, height: 64, borderRadius: '50%',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(255,255,255,0.05)',
-                }}>
-                  <div style={{
-                    width: 44, height: 44,
-                    borderRadius: '50%',
-                    background: '#00d47a',
-                    boxShadow: '0 0 20px rgba(0,212,122,0.55)',
-                  }} />
+        {/* Photo Sub-mode Switcher */}
+        {captureType === 'photo' && (
+          <div style={{
+            display: 'flex',
+            gap: 12,
+            marginBottom: 4
+          }}>
+            <button
+              onClick={() => setPhotoSubMode('tread')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 20,
+                background: photoSubMode === 'tread' ? 'rgba(0,212,122,0.15)' : 'transparent',
+                border: `1px solid ${photoSubMode === 'tread' ? '#00d47a' : 'rgba(255,255,255,0.2)'}`,
+                color: photoSubMode === 'tread' ? '#00d47a' : 'rgba(255,255,255,0.4)',
+                fontSize: 10, fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: photoSubMode === 'tread' ? '#00d47a' : 'rgba(255,255,255,0.2)' }} />
+              TREAD
+            </button>
+            <button
+              onClick={() => setPhotoSubMode('sidewall')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 20,
+                background: photoSubMode === 'sidewall' ? 'rgba(59,130,246,0.15)' : 'transparent',
+                border: `1px solid ${photoSubMode === 'sidewall' ? '#3b82f6' : 'rgba(255,255,255,0.2)'}`,
+                color: photoSubMode === 'sidewall' ? '#3b82f6' : 'rgba(255,255,255,0.4)',
+                fontSize: 10, fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: photoSubMode === 'sidewall' ? '#3b82f6' : 'rgba(255,255,255,0.2)' }} />
+              SIDEWALL
+            </button>
+          </div>
+        )}
+
+        {captureType === 'video' ? (
+          /* Video Controls */
+          <>
+            {!isRecording && isCameraReady && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    {[0, 1, 2].map(i => (
+                      <div key={i} style={{
+                        width: 16, height: 2, borderRadius: 1,
+                        background: `rgba(0,212,122,${0.3 + i * 0.3})`,
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Hold steady · Cover full tread</span>
                 </div>
-              </button>
-            ) : (
-              <button
-                onClick={stopRecording}
-                style={{
-                  position: 'relative', background: 'none', border: 'none', padding: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{
-                  width: 64, height: 64, borderRadius: '50%',
-                  border: '2px solid rgba(239,68,68,0.45)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(239,68,68,0.07)',
-                }}>
-                  <div style={{
-                    width: 44, height: 44,
-                    borderRadius: 8,
-                    background: '#ef4444',
-                    boxShadow: '0 0 20px rgba(239,68,68,0.6)',
-                  }} />
-                </div>
-              </button>
+              </div>
             )}
-            <span style={{
-              color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.35)',
-              fontSize: 10, letterSpacing: '0.08em',
-              animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
-            }}>
-              {isRecording ? '● STOP' : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
-            </span>
-          </div>
+            {isRecording && (
+              <div style={{ width: '100%', maxWidth: 200 }}>
+                <div style={{
+                  width: '100%', height: 3, borderRadius: 2,
+                  background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 5,
+                }}>
+                  <div style={{
+                    height: '100%', borderRadius: 2,
+                    background: 'linear-gradient(90deg, #00c46e, #00d47a)',
+                    width: `${progress}%`, transition: 'width 1s linear',
+                  }} />
+                </div>
+                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+                  Recording: {formatDuration(recordingDuration)}
+                </span>
+              </div>
+            )}
 
-          <div style={{ width: 72 }} />
-        </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 10px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+              }}>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d47a' }} />
+                <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: 'monospace' }}>CROP · HD</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                {!isRecording ? (
+                  <button
+                    onClick={startRecording}
+                    disabled={!isCameraReady || recordingComplete}
+                    style={{
+                      position: 'relative', background: 'none', border: 'none', padding: 0,
+                      cursor: (!isCameraReady || recordingComplete) ? 'not-allowed' : 'pointer',
+                      opacity: (!isCameraReady || recordingComplete) ? 0.4 : 1,
+                    }}
+                  >
+                    <div style={{
+                      width: 64, height: 64, borderRadius: '50%',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(255,255,255,0.05)',
+                    }}>
+                      <div style={{
+                        width: 44, height: 44,
+                        borderRadius: '50%',
+                        background: '#00d47a',
+                        boxShadow: '0 0 20px rgba(0,212,122,0.55)',
+                      }} />
+                    </div>
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopRecording}
+                    style={{
+                      position: 'relative', background: 'none', border: 'none', padding: 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{
+                      width: 64, height: 64, borderRadius: '50%',
+                      border: '2px solid rgba(239,68,68,0.45)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(239,68,68,0.07)',
+                    }}>
+                      <div style={{
+                        width: 44, height: 44,
+                        borderRadius: 8,
+                        background: '#ef4444',
+                        boxShadow: '0 0 20px rgba(239,68,68,0.6)',
+                      }} />
+                    </div>
+                  </button>
+                )}
+                <span style={{
+                  color: isRecording ? '#ef4444' : 'rgba(255,255,255,0.35)',
+                  fontSize: 10, letterSpacing: '0.08em',
+                  animation: isRecording ? 'blink 1s ease-in-out infinite' : 'none',
+                }}>
+                  {isRecording ? '● STOP' : isCameraReady ? 'TAP TO SCAN' : 'LOADING...'}
+                </span>
+              </div>
+
+              <div style={{ width: 72 }} />
+            </div>
+          </>
+        ) : (
+          /* Photo Controls */
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <button
+                  onClick={capturePhoto}
+                  disabled={!isCameraReady || isCapturingPhoto}
+                  style={{
+                    position: 'relative', background: 'none', border: 'none', padding: 0,
+                    cursor: (!isCameraReady || isCapturingPhoto) ? 'not-allowed' : 'pointer',
+                    opacity: (!isCameraReady || isCapturingPhoto) ? 0.4 : 1,
+                  }}
+                >
+                  <div style={{
+                    width: 72, height: 72, borderRadius: '50%',
+                    border: '3px solid white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.1)',
+                  }}>
+                    <div style={{
+                      width: 58, height: 58,
+                      borderRadius: '50%',
+                      background: 'white',
+                      boxShadow: '0 0 20px rgba(255,255,255,0.4)',
+                    }} />
+                  </div>
+                </button>
+                <span style={{
+                  color: 'white',
+                  fontSize: 10, letterSpacing: '0.1em', fontWeight: 600
+                }}>
+                  {isCameraReady ? 'CLICK PHOTO' : 'LOADING...'}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ══ SCAN COMPLETE ══ */}
@@ -1069,6 +1345,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         @keyframes pulse {
           0%, 100% { opacity: 0.4; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes shutter {
+          0% { opacity: 0; }
+          20% { opacity: 1; }
+          100% { opacity: 0; }
         }
       `}</style>
     </div>
@@ -1225,6 +1506,7 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ onContinue, onC
 const Home: React.FC = () => {
   const [stage, setStage] = useState<'home' | 'prompt' | 'camera'>('home');
   const [capturedVideos, setCapturedVideos] = useState<Array<{ cropped: string; original: string }>>([]);
+  const [capturedPhotos, setCapturedPhotos] = useState<Array<{ url: string; type: 'tread' | 'sidewall'; timestamp: number }>>([]);
 
   return (
     <div style={{
@@ -1386,6 +1668,60 @@ const Home: React.FC = () => {
           </div>
         )}
 
+        {/* Captured Photos Gallery */}
+        {capturedPhotos.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'rgba(255,255,255,0.65)' }}>Captured Photos</h3>
+              <span style={{ padding: '2px 10px', borderRadius: 20, background: 'rgba(0,212,122,0.1)', border: '1px solid rgba(0,212,122,0.2)', color: '#00d47a', fontSize: 11 }}>{capturedPhotos.length}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {capturedPhotos.map((photo, i) => (
+                <div key={i} style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 14,
+                  padding: 8,
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  <img src={photo.url} alt={`Capture ${i}`} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 10 }} />
+                  <div style={{
+                    position: 'absolute', top: 12, right: 12,
+                    padding: '2px 8px', borderRadius: 6,
+                    background: photo.type === 'tread' ? 'rgba(0,212,122,0.9)' : 'rgba(59,130,246,0.9)',
+                    color: 'white', fontSize: 9, fontWeight: 700, textTransform: 'uppercase'
+                  }}>
+                    {photo.type}
+                  </div>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9 }}>{new Date(photo.timestamp).toLocaleTimeString()}</span>
+                    <button
+                      onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = photo.url;
+                        a.download = `tyre_${photo.type}_${photo.timestamp}.jpg`;
+                        a.click();
+                      }}
+                      style={{
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'rgba(255,255,255,0.5)',
+                        fontSize: 8,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20 }}>
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
           {([
@@ -1421,6 +1757,11 @@ const Home: React.FC = () => {
           onCapture={(croppedUrl: string, originalUrl: string) => {
             setCapturedVideos((p) => [{ cropped: croppedUrl, original: originalUrl }, ...p]);
             setStage('home');
+          }}
+          onPhotoCapture={(imageUrl: string, type: 'tread' | 'sidewall') => {
+            setCapturedPhotos((p) => [{ url: imageUrl, type, timestamp: Date.now() }, ...p]);
+            // Optional: You could show a toast here or auto-close if desired
+            // For now, we keep it open for multiple captures as proposed.
           }}
           onClose={() => setStage('home')}
         />
