@@ -768,7 +768,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
 
   {/* 🟢 Curved Capture Zone (matches tyre arc better) */}
   <path
-    d="M 10 105 A 220 140 0 0 1 190 105 L 185 80 A 200 140 0 0 0 15 80 Z"
+    d="M 10 130 A 195 180 0 0 1 190 130 L 185 80 A 195 180 0 0 0 15 80 Z"
     fill="rgba(34,197,94,0.15)"
     stroke="#22c55e"
     strokeWidth="2"
@@ -777,7 +777,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
 
   {/* 🔴 Main Alignment Arc */}
  <path
-  d="M 10 90 A 220 120 0 0 1 190 90"
+  d="M 10 100 A 210 110 0 0 1 190 100"
   fill="none"
   stroke="#ef4444"
   strokeWidth="1"
