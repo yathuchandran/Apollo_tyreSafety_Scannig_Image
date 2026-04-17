@@ -86,6 +86,22 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
     }
   };
 
+  const applyZoom = async (stream: MediaStream, zoomLevel: number) => {
+    try {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) return;
+      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+      if (capabilities.zoom) {
+        await videoTrack.applyConstraints({
+          advanced: [{ zoom: zoomLevel }] as any
+        });
+        console.log(`Zoom applied: ${zoomLevel}`);
+      }
+    } catch (error) {
+      console.error('Failed to apply zoom:', error);
+    }
+  };
+
   // Animate vertical scan line
   useEffect(() => {
     if (!isRecording) { setScanPct(0); return; }
@@ -177,6 +193,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           videoRef.current.onloadedmetadata = () => {
             setIsCameraReady(true);
             turnOnFlash(stream);
+            if (initialMode === 'photo_sidewall') {
+              applyZoom(stream, 2.5);
+            }
           };
         }
       } catch {
@@ -425,8 +444,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
       }}>
         <div style={{
           width: '100%',
-          height: 'auto',
-          aspectRatio: '6 / 7',
+          height: '100%',
           position: 'relative',
           overflow: 'hidden',
         }}>
@@ -650,11 +668,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
         /* Photo Frames */
         <div style={{
           position: 'absolute',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '80%',
-          aspectRatio: '1 / 1',
+          inset: 0,
           pointerEvents: 'none',
           zIndex: 15,
           display: 'flex',
@@ -664,8 +678,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           {photoSubMode === 'tread' ? (
             /* Refined Tread PHOTO Frame: Arched Profile with Lines */
             <div style={{
-              width: '80%',
-              height: '95%',
+              width: '100%',
+              height: '100%',
               position: 'relative',
             }}>
               <svg viewBox="0 0 100 150" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
@@ -697,22 +711,25 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               </svg>
 
               <div style={{
-                position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(0,212,122,0.9)', padding: '4px 12px', borderRadius: 6,
-                color: '#001a0d', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap'
+                position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(0,212,122,0.95)', padding: '6px 16px', borderRadius: 8,
+                color: '#001a0d', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 20
               }}>
                 ALIGN TREAD IN PROFILE
               </div>
             </div>
           ) : (
-            /* Refined Sidewall PHOTO Frame: 40% Realistic Tyre Arc */
+            /* Refined Sidewall PHOTO Frame: Professional Wide-Arc */
             <div style={{
               width: '100%',
-              height: '70%',
+              height: '100%',
               position: 'relative',
-              marginTop: '-10%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <svg viewBox="0 0 200 140" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+              <svg viewBox="0 0 200 160" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
                 <defs>
                   <filter id="glowBlue">
                     <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
@@ -722,39 +739,44 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   </filter>
                 </defs>
 
-                {/* Outer Tyre Ridges (Mimicking sidewall texture) */}
+                {/* Professional Focal Zone Highlight (Curved Box) */}
                 <path 
-                  d="M 25 105 A 85 85 0 0 1 175 105" 
-                  fill="none" 
-                  stroke="#3b82f6" 
-                  strokeWidth="6" 
-                  strokeDasharray="2 4" 
-                  opacity="0.3"
+                  d="M 15 110 A 280 150 0 0 1 185 110 L 180 95 A 280 150 0 0 0 20 95 Z" 
+                  fill="rgba(59, 130, 246, 0.15)"
+                  stroke="#3b82f6"
+                  strokeWidth="1.5"
+                  opacity="0.8"
                 />
 
-                {/* Main 40% Sidewall Focal Arch */}
+                {/* Main Wide Professional Arc */}
                 <path 
-                  d="M 25 105 A 85 85 0 0 1 175 105" 
+                  d="M 10 100 A 300 120 0 0 1 190 100" 
                   fill="none" 
                   stroke="#3b82f6" 
-                  strokeWidth="3" 
-                  strokeDasharray="15 5" 
+                  strokeWidth="3.5" 
+                  strokeDasharray="20 5" 
                   filter="url(#glowBlue)"
                 />
-                
-                {/* Layered Sidewall Guides (Concentric) */}
-                <path d="M 40 105 A 70 70 0 0 1 160 105" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.6" />
-                <path d="M 55 105 A 55 55 0 0 1 145 105" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.3" strokeDasharray="4 4" />
-                
-                {/* Sidewall Ridges / Notches */}
-                <path d="M 30 105 A 80 80 0 0 1 170 105" fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="1 8" opacity="0.5" />
+
+                {/* Secondary Bottom Guide Arc */}
+                <path 
+                  d="M 20 120 A 280 140 0 0 1 180 120" 
+                  fill="none" 
+                  stroke="#3b82f6" 
+                  strokeWidth="1" 
+                  opacity="0.4"
+                />
+
+                {/* Alignment Crosshair Extensions */}
+                <path d="M 10 100 L 0 100 M 190 100 L 200 100" stroke="#3b82f6" strokeWidth="2" opacity="0.6" />
+
 
                 {/* Orientation & Focal Label */}
-                <text x="100" y="20" fill="#3b82f6" fontSize="9" fontWeight="800" textAnchor="middle" style={{ opacity: 0.8, letterSpacing: '2px' }}>SIDEWALL FOCAL 40%</text>
+                <text x="100" y="25" fill="#3b82f6" fontSize="11" fontWeight="800" textAnchor="middle" style={{ opacity: 0.9, letterSpacing: '2.5px' }}>SIDEWALL SCANNING AREA</text>
                 
-                {/* Precision Corner Brackets */}
-                <path d="M 20 100 L 25 105 L 35 105" fill="none" stroke="#3b82f6" strokeWidth="2" />
-                <path d="M 180 100 L 175 105 L 165 105" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                {/* Precision Alignment Brackets (Full Width) */}
+                <path d="M 10 90 L 10 100 L 25 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
+                <path d="M 190 90 L 190 100 L 175 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
 
                 {/* Center Focal Target */}
                 <circle cx="100" cy="45" r="6" stroke="#3b82f6" strokeWidth="1.5" fill="none" opacity="0.7" />
@@ -763,11 +785,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               </svg>
 
               <div style={{
-                position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)',
-                background: '#3b82f6', padding: '4px 12px', borderRadius: 6,
-                color: 'white', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap'
+                position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(59, 130, 246, 0.95)', padding: '10px 24px', borderRadius: 12,
+                color: 'white', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+                boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)', zIndex: 20,
+                border: '1px solid rgba(255,255,255,0.2)'
               }}>
-                ALIGN SIDEWALL ARC (40%)
+                ALIGN SPECIFICATIONS IN ARC
               </div>
             </div>
           )}

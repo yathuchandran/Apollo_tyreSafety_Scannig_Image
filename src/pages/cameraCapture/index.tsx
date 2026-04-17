@@ -102,10 +102,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           }`} />
           
           {/* Mode-specific Frame Container */}
-          <div className="relative z-10 w-full h-full flex items-center justify-center p-2">
+          <div className="relative z-10 w-full h-full flex items-center justify-center p-0">
             {captureMode === 'tread' ? (
               /* Tread Frame: Maximum screen fit with scanning effect */
-              <div className="relative w-full h-full border-[12px] border-dashed border-green-500 shadow-[inset_0_0_250px_rgba(34,197,94,0.4)] overflow-hidden rounded-xl">
+              <div className="relative w-full h-full border-[8px] border-dashed border-green-500 shadow-[inset_0_0_150px_rgba(34,197,94,0.3)] overflow-hidden">
                 {/* Dynamic Scanning Line */}
                 <div className="absolute inset-x-0 h-1.5 bg-gradient-to-r from-transparent via-green-400 to-transparent shadow-[0_0_30px_rgba(74,222,128,1)] animate-scan opacity-90" />
 
@@ -124,39 +124,63 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                 </div>
 
                 {/* Premium Corner Accents - true corners */}
-                <div className="absolute top-0 left-0 w-48 h-48 border-t-[16px] border-l-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-tl-lg" />
-                <div className="absolute top-0 right-0 w-48 h-48 border-t-[16px] border-r-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-tr-lg" />
-                <div className="absolute bottom-0 left-0 w-48 h-48 border-b-[16px] border-l-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-bl-lg" />
-                <div className="absolute bottom-0 right-0 w-48 h-48 border-b-[16px] border-r-[16px] border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.6)] rounded-br-lg" />
+                <div className="absolute top-0 left-0 w-32 h-32 border-t-[12px] border-l-[12px] border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)]" />
+                <div className="absolute top-0 right-0 w-32 h-32 border-t-[12px] border-r-[12px] border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)]" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 border-b-[12px] border-l-[12px] border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)]" />
+                <div className="absolute bottom-0 right-0 w-32 h-32 border-b-[12px] border-r-[12px] border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)]" />
               </div>
             ) : (
-              /* Sidewall Frame: Maximum diameter circle with glowing focus */
-              <div className="relative w-[98vmin] h-[98vmin] border-[6px] border-dashed border-blue-400 rounded-full shadow-[0_0_200px_rgba(96,165,250,0.6)] bg-blue-500/5 backdrop-blur-[2px] flex items-center justify-center">
-                {/* Focus Ring Animation */}
-                <div className="absolute inset-0 border-[8px] border-blue-400 rounded-full animate-pulse opacity-50" />
-                
-                {/* Inner circle guide */}
-                <div className="absolute inset-[12%] border-2 border-blue-300/40 rounded-full border-dotted" />
-                
-                {/* Center crosshair */}
-                <div className="absolute w-40 h-40 flex items-center justify-center">
-                  <div className="w-full h-[5px] bg-blue-400 absolute shadow-[0_0_40px_rgba(96,165,250,1)]" />
-                  <div className="w-[5px] h-full bg-blue-400 absolute shadow-[0_0_40px_rgba(96,165,250,1)]" />
-                </div>
-                
-                {/* Floating Brackets */}
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-12 py-4 bg-blue-600/95 backdrop-blur-md text-[18px] text-white rounded-full font-bold uppercase tracking-widest shadow-2xl border border-blue-400/50 animate-bounce-subtle">
-                  Top
-                </div>
-                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-12 py-4 bg-blue-600/95 backdrop-blur-md text-[18px] text-white rounded-full font-bold uppercase tracking-widest shadow-2xl border border-blue-400/50 animate-bounce-subtle-reverse">
-                  Bottom
+              /* Professional Sidewall Wide-Arc Overlay */
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4">
+                <div className="w-full h-full relative flex items-center justify-center">
+                  <svg viewBox="0 0 200 160" className="w-full h-full drop-shadow-2xl overflow-visible">
+                    <defs>
+                      <filter id="glowBlue">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                    </defs>
+
+                    {/* Focal spec guide (Curved Highlight) */}
+                    <path 
+                      d="M 15 105 A 280 150 0 0 1 185 105 L 180 90 A 280 150 0 0 0 20 90 Z" 
+                      fill="rgba(59, 130, 246, 0.2)"
+                      stroke="#60a5fa"
+                      strokeWidth="1"
+                    />
+
+                    {/* Main Professional Arc */}
+                    <path 
+                      d="M 10 95 A 300 120 0 0 1 190 95" 
+                      fill="none" 
+                      stroke="#3b82f6" 
+                      strokeWidth="4" 
+                      strokeDasharray="18 6" 
+                      filter="url(#glowBlue)"
+                    />
+
+                    {/* Precision Brackets */}
+                    <path d="M 10 85 L 10 95 L 25 95" fill="none" stroke="#60a5fa" strokeWidth="2.5" />
+                    <path d="M 190 85 L 190 95 L 175 95" fill="none" stroke="#60a5fa" strokeWidth="2.5" />
+
+                    <text x="100" y="30" fill="#60a5fa" fontSize="10" fontWeight="800" textAnchor="middle" style={{ letterSpacing: '2px' }}>
+                      SIDEWALL SPECIFICATIONS GUIDE
+                    </text>
+                  </svg>
+
+                  {/* Floating Action Instruction */}
+                  <div className="absolute top-[65%] left-1/2 -translate-x-1/2 bg-blue-600/90 backdrop-blur-lg px-8 py-3 rounded-2xl shadow-2xl border border-white/20 animate-bounce-subtle">
+                    <p className="text-white font-bold text-sm tracking-widest uppercase">
+                      Center Text in Arc
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
           {/* Labels and Instructions */}
-          <div className="absolute top-10 left-0 right-0 text-center z-30">
+          {/* <div className="absolute top-10 left-0 right-0 text-center z-30">
             <div className="inline-block bg-black/40 backdrop-blur-xl px-8 py-3 rounded-full border border-white/20 shadow-2xl">
               <p className="text-white text-lg font-semibold flex items-center gap-3">
                 {captureMode === 'tread' ? (
@@ -172,7 +196,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                 )}
               </p>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Capture Shutter Animation */}
@@ -182,7 +206,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       </div>
 
       {/* Control Bar Overlay */}
-      <div className="absolute bottom-0 left-0 right-0 z-40 px-6 py-10 pb-12 flex flex-col gap-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent backdrop-blur-[2px]">
+      <div className="absolute bottom-0 left-0 right-0 z-40 px-6 py-6 pb-10 flex flex-col gap-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
         {/* Mode Selector */}
         <div className="flex justify-center">
           <div className="bg-white/10 backdrop-blur-2xl p-1.5 rounded-2xl flex gap-1 border border-white/10 shadow-2xl">
