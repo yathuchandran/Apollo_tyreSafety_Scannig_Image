@@ -724,9 +724,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               </div>
             </div>
           ) : (
-            /* Refined Sidewall PHOTO Frame: Professional Wide-Arc */
+            /* Refined Sidewall PHOTO Frame: Professional Wide-Arc rotated for landscape */
             <div style={{
               width: '100%',
+              height: '100%',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
               <svg
                 viewBox="0 0 200 200"
                 style={{
@@ -813,29 +819,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                 >
                   Keep tyre straight • Avoid tilt • Good lighting
                 </text>
-              </svg>oke="#3b82f6" />
-
-  {/* 🔽 Bottom Hint */}
-  <text
-    x="100"
-    y="150"
-    textAnchor="middle"
-    fontSize="7"
-    fill="#9ca3af"
-  >
-    Keep tyre straight • Avoid tilt • Good lighting
-  </text>
-</svg>
-
-              {/* <div style={{
-                position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(59, 130, 246, 0.95)', padding: '8px 20px', borderRadius: 12,
-                color: 'white', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-                boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)', zIndex: 20,
-                border: '1px solid rgba(255,255,255,0.2)'
-              }}>
-                ALIGN SPECIFICATIONS IN ARC
-              </div> */}
+              </svg>
             </div>
           )}
         </div>
