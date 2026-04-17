@@ -739,59 +739,51 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   </filter>
                 </defs>
 
-                {/* Professional Focal Zone Highlight (Curved Box) */}
+                {/* Focused scanning target area (Curved Box) - 50% width version */}
                 <path 
-                  d="M 15 110 A 280 150 0 0 1 185 110 L 180 95 A 280 150 0 0 0 20 95 Z" 
-                  fill="rgba(59, 130, 246, 0.15)"
+                  d="M 50 100 A 150 70 0 0 1 150 100 L 145 85 A 150 70 0 0 0 55 85 Z" 
+                  fill="rgba(59, 130, 246, 0.2)"
                   stroke="#3b82f6"
-                  strokeWidth="1.5"
-                  opacity="0.8"
+                  strokeWidth="2"
+                  opacity="0.9"
                 />
 
-                {/* Main Wide Professional Arc */}
+                {/* Precision Alignment Markers */}
+                <path d="M 45 80 L 50 80 L 50 85" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <path d="M 155 80 L 150 80 L 150 85" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <path d="M 45 105 L 50 105 L 50 100" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <path d="M 155 105 L 150 105 L 150 100" fill="none" stroke="#3b82f6" strokeWidth="2" />
+
+                {/* Main Scanning Arch (Centered & Focused) */}
                 <path 
-                  d="M 10 100 A 300 120 0 0 1 190 100" 
+                  d="M 40 92 A 180 80 0 0 1 160 92" 
                   fill="none" 
                   stroke="#3b82f6" 
-                  strokeWidth="3.5" 
-                  strokeDasharray="20 5" 
+                  strokeWidth="4" 
+                  strokeDasharray="15 5" 
                   filter="url(#glowBlue)"
                 />
 
-                {/* Secondary Bottom Guide Arc */}
-                <path 
-                  d="M 20 120 A 280 140 0 0 1 180 120" 
-                  fill="none" 
-                  stroke="#3b82f6" 
-                  strokeWidth="1" 
-                  opacity="0.4"
-                />
-
-                {/* Alignment Crosshair Extensions */}
-                <path d="M 10 100 L 0 100 M 190 100 L 200 100" stroke="#3b82f6" strokeWidth="2" opacity="0.6" />
-
+                {/* Center Focal Target */}
+                <circle cx="100" cy="92.5" r="8" stroke="#3b82f6" strokeWidth="2" fill="rgba(59,130,246,0.1)" />
+                <line x1="90" y1="92.5" x2="110" y2="92.5" stroke="#3b82f6" strokeWidth="1.5" />
+                <line x1="100" y1="82.5" x2="100" y2="102.5" stroke="#3b82f6" strokeWidth="1.5" />
 
                 {/* Orientation & Focal Label */}
-                <text x="100" y="25" fill="#3b82f6" fontSize="11" fontWeight="800" textAnchor="middle" style={{ opacity: 0.9, letterSpacing: '2.5px' }}>SIDEWALL SCANNING AREA</text>
-                
-                {/* Precision Alignment Brackets (Full Width) */}
-                <path d="M 10 90 L 10 100 L 25 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
-                <path d="M 190 90 L 190 100 L 175 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
-
-                {/* Center Focal Target */}
-                <circle cx="100" cy="45" r="6" stroke="#3b82f6" strokeWidth="1.5" fill="none" opacity="0.7" />
+                <text x="100" y="30" fill="#3b82f6" fontSize="12" fontWeight="900" textAnchor="middle" style={{ letterSpacing: '3px' }}>FOCUSED SCANNING AREA</text>
                 <line x1="90" y1="45" x2="110" y2="45" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
                 <line x1="100" y1="35" x2="100" y2="55" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
               </svg>
 
               <div style={{
                 position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(59, 130, 246, 0.95)', padding: '10px 24px', borderRadius: 12,
-                color: 'white', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
-                boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)', zIndex: 20,
-                border: '1px solid rgba(255,255,255,0.2)'
+                background: 'rgba(59, 130, 246, 0.95)', padding: '12px 32px', borderRadius: 16,
+                color: 'white', fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap',
+                boxShadow: '0 12px 32px rgba(59, 130, 246, 0.5)', zIndex: 20,
+                border: '2px solid rgba(255,255,255,0.4)',
+                textTransform: 'uppercase', letterSpacing: '1px'
               }}>
-                ALIGN SPECIFICATIONS IN ARC
+                Target Defect / Specs
               </div>
             </div>
           )}

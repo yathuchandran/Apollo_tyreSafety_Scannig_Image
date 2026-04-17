@@ -141,37 +141,39 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                       </filter>
                     </defs>
 
-                    {/* Focal spec guide (Curved Highlight) */}
+                    {/* Professional Focused Target Zone */}
                     <path 
-                      d="M 15 105 A 280 150 0 0 1 185 105 L 180 90 A 280 150 0 0 0 20 90 Z" 
+                      d="M 50 100 A 150 70 0 0 1 150 100 L 145 85 A 150 70 0 0 0 55 85 Z" 
                       fill="rgba(59, 130, 246, 0.2)"
                       stroke="#60a5fa"
-                      strokeWidth="1"
+                      strokeWidth="2"
                     />
 
-                    {/* Main Professional Arc */}
+                    {/* Target Corners */}
+                    <path d="M 45 80 L 50 80 L 50 85" fill="none" stroke="#60a5fa" strokeWidth="2" />
+                    <path d="M 155 80 L 150 80 L 150 85" fill="none" stroke="#60a5fa" strokeWidth="2" />
+                    <path d="M 45 105 L 50 105 L 50 100" fill="none" stroke="#60a5fa" strokeWidth="2" />
+                    <path d="M 155 105 L 150 105 L 150 100" fill="none" stroke="#60a5fa" strokeWidth="2" />
+
+                    {/* Main Focused Arch */}
                     <path 
-                      d="M 10 95 A 300 120 0 0 1 190 95" 
+                      d="M 40 92 A 180 80 0 0 1 160 92" 
                       fill="none" 
                       stroke="#3b82f6" 
                       strokeWidth="4" 
-                      strokeDasharray="18 6" 
+                      strokeDasharray="12 4" 
                       filter="url(#glowBlue)"
                     />
 
-                    {/* Precision Brackets */}
-                    <path d="M 10 85 L 10 95 L 25 95" fill="none" stroke="#60a5fa" strokeWidth="2.5" />
-                    <path d="M 190 85 L 190 95 L 175 95" fill="none" stroke="#60a5fa" strokeWidth="2.5" />
-
-                    <text x="100" y="30" fill="#60a5fa" fontSize="10" fontWeight="800" textAnchor="middle" style={{ letterSpacing: '2px' }}>
-                      SIDEWALL SPECIFICATIONS GUIDE
+                    <text x="100" y="30" fill="#60a5fa" fontSize="10" fontWeight="900" textAnchor="middle" style={{ letterSpacing: '2px' }}>
+                      FOCUSED TARGET SCAN
                     </text>
                   </svg>
 
                   {/* Floating Action Instruction */}
                   <div className="absolute top-[65%] left-1/2 -translate-x-1/2 bg-blue-600/90 backdrop-blur-lg px-8 py-3 rounded-2xl shadow-2xl border border-white/20 animate-bounce-subtle">
                     <p className="text-white font-bold text-sm tracking-widest uppercase">
-                      Center Text in Arc
+                      Target Defect / Specs
                     </p>
                   </div>
                 </div>
