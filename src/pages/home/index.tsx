@@ -10,6 +10,7 @@ interface CameraCaptureProps {
 // Extended types for torch support
 interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
+  zoom?: any;
 }
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, onPhotoCapture, onClose }) => {
