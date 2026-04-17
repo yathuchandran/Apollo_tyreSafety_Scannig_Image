@@ -185,9 +185,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 960 },
-            aspectRatio: { exact: 4 / 3 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // Removed strict aspectRatio: { exact: 4 / 3 } to allow for a native, full-height mobile view.
           },
         });
         if (videoRef.current) {
@@ -208,7 +208,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
             video: {
               facingMode: 'environment',
               width: { ideal: 1280 },
-              height: { ideal: 960 },
+              height: { ideal: 720 },
             },
           });
           if (videoRef.current) {
