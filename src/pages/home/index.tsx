@@ -730,62 +730,114 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <svg viewBox="0 0 200 160" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                <defs>
-                  <filter id="glowBlue">
-                    <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-                    <feMerge>
-                      <feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
+             <svg
+  viewBox="0 0 200 160"
+  style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}
+>
+  <defs>
+    {/* Glow Effects */}
+    <filter id="glowBlue">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
 
-                {/* Professional Focal Zone Highlight (Curved Box) */}
-                <path
-                  d="M 5 110 A 300 150 0 0 1 195 110 L 192 95 A 300 150 0 0 0 8 95 Z"
-                  fill="rgba(59, 130, 246, 0.15)"
-                  stroke="#3b82f6"
-                  strokeWidth="1.5"
-                  opacity="0.8"
-                />
+    <filter id="glowGreen">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
 
-                {/* Main Wide Professional Arc */}
-                <path
-                  d="M 4 100 A 300 120 0 0 1 196 100"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="3.5"
-                  strokeDasharray="20 5"
-                  filter="url(#glowBlue)"
-                />
+  {/* 🔵 Instruction Text */}
+  <text
+    x="100"
+    y="18"
+    textAnchor="middle"
+    fontSize="8"
+    fill="#f63b3b"
+    fontWeight="600"
+    letterSpacing="1.5"
+  >
+    ALIGN TYRE TEXT INSIDE FRAME
+  </text>
 
-                {/* Secondary Bottom Guide Arc */}
-                <path
-                  d="M 8 120 A 300 140 0 0 1 192 120"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="1"
-                  opacity="0.4"
-                />
+  {/* 🟢 Curved Capture Zone (matches tyre arc better) */}
+  <path
+    d="M 10 105 A 220 140 0 0 1 190 105 L 185 80 A 200 140 0 0 0 15 80 Z"
+    fill="rgba(34,197,94,0.15)"
+    stroke="#22c55e"
+    strokeWidth="2"
+    filter="url(#glowGreen)"
+  />
 
-                {/* Alignment Crosshair Extensions */}
-                <path d="M 4 100 L 0 100 M 196 100 L 200 100" stroke="#3b82f6" strokeWidth="2" opacity="0.6" />
+  {/* 🔴 Main Alignment Arc */}
+ <path
+  d="M 10 90 A 220 120 0 0 1 190 90"
+  fill="none"
+  stroke="#ef4444"
+  strokeWidth="1"
+  strokeDasharray="6 5"
+/>
 
+  {/* 🔵 Secondary Guide Arc */}
+  <path
+    d="M 15 115 A 260 150 0 0 1 185 115"
+    fill="none"
+    stroke="#3b82f6"
+    strokeWidth="1"
+    opacity="0.4"
+  />
 
-                {/* Orientation & Focal Label */}
-                <text x="100" y="25" fill="#3b82f6" fontSize="7.5" fontWeight="700" textAnchor="middle" style={{ opacity: 0.8, letterSpacing: '2px' }}>SIDEWALL SCANNING AREA</text>
+  {/* 🎯 Center Focus Line (for text alignment) */}
+  {/* <line
+    x1="40"
+    y1="100"
+    x2="160"
+    y2="100"
+    stroke="#f63b3b"
+    strokeWidth="1.5"
+    strokeDasharray="4 4"
+  /> */}
 
-                {/* Precision Alignment Brackets (Full Width) */}
-                <path d="M 4 90 L 4 100 L 19 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
-                <path d="M 196 90 L 196 100 L 181 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
+  {/* 📌 Left Bracket */}
+  {/* <path
+    d="M 10 85 L 10 100 L 25 100"
+    stroke="#3bf65a"
+    strokeWidth="2.5"
+    fill="none"
+  /> */}
 
-                {/* Center Focal Target */}
-                <circle cx="100" cy="45" r="6" stroke="#3b82f6" strokeWidth="1.5" fill="none" opacity="0.7" />
-                <line x1="90" y1="45" x2="110" y2="45" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
-                <line x1="100" y1="35" x2="100" y2="55" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
-              </svg>
+  {/* 📌 Right Bracket */}
+  {/* <path
+    d="M 190 85 L 190 100 L 175 100"
+    stroke="#3bf65a"
+    strokeWidth="2.5"
+    fill="none"
+  /> */}
 
-              <div style={{
+  {/* 🎯 Center Crosshair */}
+  <circle cx="100" cy="60" r="6" stroke="#3b82f6" fill="none" />
+  <line x1="90" y1="60" x2="110" y2="60" stroke="#3b82f6" />
+  <line x1="100" y1="50" x2="100" y2="70" stroke="#3b82f6" />
+
+  {/* 🔽 Bottom Hint */}
+  <text
+    x="100"
+    y="150"
+    textAnchor="middle"
+    fontSize="7"
+    fill="#9ca3af"
+  >
+    Keep tyre straight • Avoid tilt • Good lighting
+  </text>
+</svg>
+
+              {/* <div style={{
                 position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
                 background: 'rgba(59, 130, 246, 0.95)', padding: '8px 20px', borderRadius: 12,
                 color: 'white', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
@@ -793,7 +845,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                 border: '1px solid rgba(255,255,255,0.2)'
               }}>
                 ALIGN SPECIFICATIONS IN ARC
-              </div>
+              </div> */}
             </div>
           )}
         </div>
