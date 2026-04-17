@@ -727,106 +727,93 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
             /* Refined Sidewall PHOTO Frame: Professional Wide-Arc */
             <div style={{
               width: '100%',
-              height: '100%',
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-             <svg
-  viewBox="0 0 200 160"
-  style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}
->
-  <defs>
-    {/* Glow Effects */}
-    <filter id="glowBlue">
-      <feGaussianBlur stdDeviation="2" result="blur" />
-      <feMerge>
-        <feMergeNode in="blur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
+              <svg
+                viewBox="0 0 200 200"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  transform: 'rotate(90deg)',
+                  transformOrigin: 'center center'
+                }}
+              >
+                <defs>
+                  {/* Glow Effects */}
+                  <filter id="glowBlue">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
 
-    <filter id="glowGreen">
-      <feGaussianBlur stdDeviation="2" result="blur" />
-      <feMerge>
-        <feMergeNode in="blur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
-  </defs>
+                  <filter id="glowGreen">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
 
-  {/* 🔵 Instruction Text */}
-  <text
-    x="100"
-    y="18"
-    textAnchor="middle"
-    fontSize="8"
-    fill="#f63b3b"
-    fontWeight="600"
-    letterSpacing="1.5"
-  >
-    ALIGN TYRE TEXT INSIDE FRAME
-  </text>
+                {/* 🔵 Instruction Text - Rotated to be vertical on screen (horizontal in hand) */}
+                <text
+                  x="100"
+                  y="20"
+                  textAnchor="middle"
+                  fontSize="8"
+                  fill="#f63b3b"
+                  fontWeight="600"
+                  letterSpacing="1.5"
+                >
+                  ALIGN TYRE TEXT INSIDE FRAME
+                </text>
 
-  {/* 🟢 Curved Capture Zone (refined for 10cm distance) */}
-  <path
-    d="M 5 140 A 200 160 0 0 1 195 140 L 190 70 A 200 160 0 0 0 10 70 Z"
-    fill="rgba(34,197,94,0.12)"
-    stroke="#22c55e"
-    strokeWidth="2.5"
-    filter="url(#glowGreen)"
-  />
+                {/* 🟢 Curved Capture Zone (Landscape Orientation) */}
+                <path
+                  d="M 5 150 A 200 160 0 0 1 195 150 L 190 80 A 200 160 0 0 0 10 80 Z"
+                  fill="rgba(34,197,94,0.12)"
+                  stroke="#22c55e"
+                  strokeWidth="2.5"
+                  filter="url(#glowGreen)"
+                />
 
-  {/* 🔴 Main Alignment Arc (Shifted slightly) */}
- <path
-  d="M 5 105 A 215 115 0 0 1 195 105"
-  fill="none"
-  stroke="#ef4444"
-  strokeWidth="1.2"
-  strokeDasharray="8 6"
-/>
+                {/* 🔴 Main Alignment Arc */}
+                <path
+                  d="M 5 115 A 215 115 0 0 1 195 115"
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="1.2"
+                  strokeDasharray="8 6"
+                />
 
-  {/* 🔵 Secondary Guide Arc */}
-  <path
-    d="M 10 120 A 265 155 0 0 1 190 120"
-    fill="none"
-    stroke="#3b82f6"
-    strokeWidth="1.2"
-    opacity="0.35"
-  />
+                {/* 🔵 Secondary Guide Arc */}
+                <path
+                  d="M 10 130 A 265 155 0 0 1 190 130"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="1.2"
+                  opacity="0.35"
+                />
 
-  {/* 🎯 Center Focus Line (for text alignment) */}
-  {/* <line
-    x1="40"
-    y1="100"
-    x2="160"
-    y2="100"
-    stroke="#f63b3b"
-    strokeWidth="1.5"
-    strokeDasharray="4 4"
-  /> */}
+                {/* 🎯 Center Crosshair */}
+                <circle cx="100" cy="70" r="6" stroke="#3b82f6" fill="none" />
+                <line x1="90" y1="70" x2="110" y2="70" stroke="#3b82f6" />
+                <line x1="100" y1="60" x2="100" y2="80" stroke="#3b82f6" />
 
-  {/* 📌 Left Bracket */}
-  {/* <path
-    d="M 10 85 L 10 100 L 25 100"
-    stroke="#3bf65a"
-    strokeWidth="2.5"
-    fill="none"
-  /> */}
-
-  {/* 📌 Right Bracket */}
-  {/* <path
-    d="M 190 85 L 190 100 L 175 100"
-    stroke="#3bf65a"
-    strokeWidth="2.5"
-    fill="none"
-  /> */}
-
-  {/* 🎯 Center Crosshair */}
-  <circle cx="100" cy="60" r="6" stroke="#3b82f6" fill="none" />
-  <line x1="90" y1="60" x2="110" y2="60" stroke="#3b82f6" />
-  <line x1="100" y1="50" x2="100" y2="70" stroke="#3b82f6" />
+                {/* 🔽 Bottom Hint */}
+                <text
+                  x="100"
+                  y="180"
+                  textAnchor="middle"
+                  fontSize="7"
+                  fill="#9ca3af"
+                >
+                  Keep tyre straight • Avoid tilt • Good lighting
+                </text>
+              </svg>oke="#3b82f6" />
 
   {/* 🔽 Bottom Hint */}
   <text
