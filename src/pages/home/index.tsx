@@ -195,7 +195,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
             setIsCameraReady(true);
             turnOnFlash(stream);
             if (initialMode === 'photo_sidewall') {
-              applyZoom(stream, 2.5);
+              // Automatic zoom removed as per user request for 10cm capture distance.
+              // applyZoom(stream, 2.5);
             }
           };
         }
@@ -766,31 +767,31 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
     ALIGN TYRE TEXT INSIDE FRAME
   </text>
 
-  {/* 🟢 Curved Capture Zone (matches tyre arc better) */}
+  {/* 🟢 Curved Capture Zone (refined for 10cm distance) */}
   <path
-    d="M 10 130 A 195 180 0 0 1 190 130 L 185 80 A 195 180 0 0 0 15 80 Z"
-    fill="rgba(34,197,94,0.15)"
+    d="M 5 140 A 200 160 0 0 1 195 140 L 190 70 A 200 160 0 0 0 10 70 Z"
+    fill="rgba(34,197,94,0.12)"
     stroke="#22c55e"
-    strokeWidth="2"
+    strokeWidth="2.5"
     filter="url(#glowGreen)"
   />
 
-  {/* 🔴 Main Alignment Arc */}
+  {/* 🔴 Main Alignment Arc (Shifted slightly) */}
  <path
-  d="M 10 100 A 210 110 0 0 1 190 100"
+  d="M 5 105 A 215 115 0 0 1 195 105"
   fill="none"
   stroke="#ef4444"
-  strokeWidth="1"
-  strokeDasharray="6 5"
+  strokeWidth="1.2"
+  strokeDasharray="8 6"
 />
 
   {/* 🔵 Secondary Guide Arc */}
   <path
-    d="M 15 115 A 260 150 0 0 1 185 115"
+    d="M 10 120 A 265 155 0 0 1 190 120"
     fill="none"
     stroke="#3b82f6"
-    strokeWidth="1"
-    opacity="0.4"
+    strokeWidth="1.2"
+    opacity="0.35"
   />
 
   {/* 🎯 Center Focus Line (for text alignment) */}
