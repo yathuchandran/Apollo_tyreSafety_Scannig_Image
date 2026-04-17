@@ -87,6 +87,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
     }
   };
 
+  /*
   const applyZoom = async (stream: MediaStream, zoomLevel: number) => {
     try {
       const videoTrack = stream.getVideoTracks()[0];
@@ -102,6 +103,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
       console.error('Failed to apply zoom:', error);
     }
   };
+  */
 
   // Animate vertical scan line
   useEffect(() => {
