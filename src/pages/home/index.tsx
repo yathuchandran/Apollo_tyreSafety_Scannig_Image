@@ -239,78 +239,78 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
   }, [onClose]);
 
   const startRecording = () => {
-  if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current || !videoRef.current) return;
+    if (!streamRef.current || isRecording || !isCameraReady || !canvasRef.current || !videoRef.current) return;
 
-  setShowEndFrame(false);
+    setShowEndFrame(false);
 
-  const video = videoRef.current;
-  const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
 
-  // --- CROP PARAMETERS ---
-  const leftTrimPercent = 0.20; // Start at 20%
-  const heightPct = 0.30;       // 30% tall slice
+    // --- CROP PARAMETERS ---
+    const leftTrimPercent = 0.20; // Start at 20%
+    const heightPct = 0.30;       // 30% tall slice
 
-  // sx is our starting point on the X axis
-  const sx = video.videoWidth * leftTrimPercent;
-  
-  // Calculate width to reach the ABSOLUTE right edge (100% width)
-  // video.videoWidth - sx gives us every pixel remaining to the right
-  const sWidth = video.videoWidth - sx;
-  const sHeight = video.videoHeight * heightPct;
+    // sx is our starting point on the X axis
+    const sx = video.videoWidth * leftTrimPercent;
 
-  // VP8/WebM encoders prefer even numbers for dimensions.
-  // We set the canvas size once here and do NOT change it during the loop.
-  canvas.width = Math.floor(sWidth / 2) * 2;
-  canvas.height = Math.floor(sHeight / 2) * 2;
+    // Calculate width to reach the ABSOLUTE right edge (100% width)
+    // video.videoWidth - sx gives us every pixel remaining to the right
+    const sWidth = video.videoWidth - sx;
+    const sHeight = video.videoHeight * heightPct;
 
-  croppedChunksRef.current = [];
-  originalChunksRef.current = [];
+    // VP8/WebM encoders prefer even numbers for dimensions.
+    // We set the canvas size once here and do NOT change it during the loop.
+    canvas.width = Math.floor(sWidth / 2) * 2;
+    canvas.height = Math.floor(sHeight / 2) * 2;
 
-  const canvasStream = canvas.captureStream(30);
-  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-    ? 'video/webm;codecs=vp8'
-    : 'video/webm';
+    croppedChunksRef.current = [];
+    originalChunksRef.current = [];
 
-  const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
-  croppedRecorderRef.current = croppedRecorder;
+    const canvasStream = canvas.captureStream(30);
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+      ? 'video/webm;codecs=vp8'
+      : 'video/webm';
 
-  croppedRecorder.ondataavailable = (e: BlobEvent) => {
-    if (e.data.size > 0) croppedChunksRef.current.push(e.data);
+    const croppedRecorder = new MediaRecorder(canvasStream, { mimeType });
+    croppedRecorderRef.current = croppedRecorder;
+
+    croppedRecorder.ondataavailable = (e: BlobEvent) => {
+      if (e.data.size > 0) croppedChunksRef.current.push(e.data);
+    };
+
+    const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
+    originalRecorderRef.current = originalRecorder;
+
+    originalRecorder.ondataavailable = (e: BlobEvent) => {
+      if (e.data.size > 0) originalChunksRef.current.push(e.data);
+    };
+
+    let croppedReady = false;
+    let originalReady = false;
+
+    const processVideos = () => {
+      if (croppedReady && originalReady) {
+        const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
+        const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
+        onCapture(URL.createObjectURL(croppedBlob), URL.createObjectURL(originalBlob));
+      }
+    };
+
+    croppedRecorder.onstop = () => { croppedReady = true; processVideos(); };
+    originalRecorder.onstop = () => { originalReady = true; processVideos(); };
+
+    croppedRecorder.start(1000);
+    originalRecorder.start(1000);
+
+    recordingStartTimeRef.current = Date.now();
+    setRecordingDuration(0);
+    durationIntervalRef.current = setInterval(() => {
+      setRecordingDuration(prev => prev + 1);
+    }, 1000);
+
+    setIsRecording(true);
+    drawToCanvas();
   };
-
-  const originalRecorder = new MediaRecorder(streamRef.current, { mimeType });
-  originalRecorderRef.current = originalRecorder;
-
-  originalRecorder.ondataavailable = (e: BlobEvent) => {
-    if (e.data.size > 0) originalChunksRef.current.push(e.data);
-  };
-
-  let croppedReady = false;
-  let originalReady = false;
-
-  const processVideos = () => {
-    if (croppedReady && originalReady) {
-      const croppedBlob = new Blob(croppedChunksRef.current, { type: mimeType });
-      const originalBlob = new Blob(originalChunksRef.current, { type: mimeType });
-      onCapture(URL.createObjectURL(croppedBlob), URL.createObjectURL(originalBlob));
-    }
-  };
-
-  croppedRecorder.onstop = () => { croppedReady = true; processVideos(); };
-  originalRecorder.onstop = () => { originalReady = true; processVideos(); };
-
-  croppedRecorder.start(1000);
-  originalRecorder.start(1000);
-
-  recordingStartTimeRef.current = Date.now();
-  setRecordingDuration(0);
-  durationIntervalRef.current = setInterval(() => {
-    setRecordingDuration(prev => prev + 1);
-  }, 1000);
-
-  setIsRecording(true);
-  drawToCanvas();
-};
 
   const stopRecording = () => {
     if (!isRecording) return;
@@ -350,7 +350,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
     if (navigator.vibrate) navigator.vibrate(100);
 
     const video = videoRef.current;
-    
+
     // Create a temporary canvas for capture
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -511,160 +511,160 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           pointerEvents: 'none',
           zIndex: 15,
         }}>
-        <svg
-          viewBox="0 0 280 630"
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
-        >
-          <defs>
-            <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
-              <stop offset="50%" stopColor="#00d47a" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#00d47a" stopOpacity="0.9" />
-            </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
+          <svg
+            viewBox="0 0 280 630"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}
+          >
+            <defs>
+              <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00d47a" stopOpacity="0.9" />
+                <stop offset="50%" stopColor="#00d47a" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#00d47a" stopOpacity="0.9" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-          <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
+            <rect x="4" y="4" width="272" height="622" rx="16" fill="rgba(0,212,122,0.03)" />
 
-          <path
-            d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 252 18 L 222 18 Q 218 18 218 22 L 218 48"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 28 612 L 58 612 Q 62 612 62 608 L 62 582"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 252 612 L 222 612 Q 218 612 218 608 L 218 582"
-            fill="none"
-            stroke="#00d47a"
-            strokeOpacity="0.35"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-
-          {[126, 210, 315, 420, 504].map((y, i) => (
-            <line
-              key={y}
-              x1="15"
-              y1={y}
-              x2="265"
-              y2={y}
+            <path
+              d="M 28 18 L 58 18 Q 62 18 62 22 L 62 48"
+              fill="none"
               stroke="#00d47a"
-              strokeWidth={i === 2 ? 1.2 : 0.6}
-              opacity={i === 2 ? 0.35 : 0.12}
-              strokeDasharray={i === 2 ? "none" : "4 6"}
+              strokeOpacity="0.35"
+              strokeWidth="1.2"
+              strokeLinecap="round"
             />
-          ))}
+            <path
+              d="M 252 18 L 222 18 Q 218 18 218 22 L 218 48"
+              fill="none"
+              stroke="#00d47a"
+              strokeOpacity="0.35"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 28 612 L 58 612 Q 62 612 62 608 L 62 582"
+              fill="none"
+              stroke="#00d47a"
+              strokeOpacity="0.35"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 252 612 L 222 612 Q 218 612 218 608 L 218 582"
+              fill="none"
+              stroke="#00d47a"
+              strokeOpacity="0.35"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
 
-          <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
-            <animate attributeName="opacity" values="0.2;0.9;0.2" dur="2s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="140" cy="315" r="3" fill="#00d47a" opacity="0.5">
-            <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite" />
-          </circle>
-          <line x1="122" y1="315" x2="158" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
-          <line x1="140" y1="297" x2="140" y2="333" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
+            {[126, 210, 315, 420, 504].map((y, i) => (
+              <line
+                key={y}
+                x1="15"
+                y1={y}
+                x2="265"
+                y2={y}
+                stroke="#00d47a"
+                strokeWidth={i === 2 ? 1.2 : 0.6}
+                opacity={i === 2 ? 0.35 : 0.12}
+                strokeDasharray={i === 2 ? "none" : "4 6"}
+              />
+            ))}
 
-          {[126, 210, 315, 420, 504].map((y, i) => (
-            <g key={`tick-${y}`}>
+            <circle cx="140" cy="315" r="8" fill="none" stroke="#00d47a" strokeWidth="1.5" opacity="0.7">
+              <animate attributeName="opacity" values="0.2;0.9;0.2" dur="2s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="140" cy="315" r="3" fill="#00d47a" opacity="0.5">
+              <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite" />
+            </circle>
+            <line x1="122" y1="315" x2="158" y2="315" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
+            <line x1="140" y1="297" x2="140" y2="333" stroke="#00d47a" strokeWidth="0.8" opacity="0.4" />
+
+            {[126, 210, 315, 420, 504].map((y, i) => (
+              <g key={`tick-${y}`}>
+                <line
+                  x1="12"
+                  y1={y}
+                  x2={i === 2 ? 20 : 17}
+                  y2={y}
+                  stroke="#00d47a"
+                  strokeWidth={i === 2 ? 2 : 1}
+                  opacity="0.5"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="268"
+                  y1={y}
+                  x2={i === 2 ? 260 : 263}
+                  y2={y}
+                  stroke="#00d47a"
+                  strokeWidth={i === 2 ? 2 : 1}
+                  opacity="0.5"
+                  strokeLinecap="round"
+                />
+              </g>
+            ))}
+
+            {isRecording && (
               <line
                 x1="12"
-                y1={y}
-                x2={i === 2 ? 20 : 17}
-                y2={y}
+                y1={scanPct * 6.3}
+                x2="268"
+                y2={scanPct * 6.3}
                 stroke="#00d47a"
-                strokeWidth={i === 2 ? 2 : 1}
-                opacity="0.5"
-                strokeLinecap="round"
-              />
-              <line
-                x1="268"
-                y1={y}
-                x2={i === 2 ? 260 : 263}
-                y2={y}
-                stroke="#00d47a"
-                strokeWidth={i === 2 ? 2 : 1}
-                opacity="0.5"
-                strokeLinecap="round"
-              />
-            </g>
-          ))}
+                strokeWidth="2.5"
+                opacity="0.85"
+                filter="url(#glow)"
+              >
+                <animate attributeName="opacity" values="0.3;0.95;0.3" dur="0.4s" repeatCount="indefinite" />
+              </line>
+            )}
 
-          {isRecording && (
-            <line
-              x1="12"
-              y1={scanPct * 6.3}
-              x2="268"
-              y2={scanPct * 6.3}
-              stroke="#00d47a"
-              strokeWidth="2.5"
-              opacity="0.85"
-              filter="url(#glow)"
-            >
-              <animate attributeName="opacity" values="0.3;0.95;0.3" dur="0.4s" repeatCount="indefinite" />
-            </line>
-          )}
+            <rect
+              x="8"
+              y="8"
+              width="264"
+              height="614"
+              rx="12"
+              fill="none"
+              stroke="rgba(0,212,122,0.25)"
+              strokeWidth="1"
+              strokeDasharray="8 6"
+              style={{ animation: 'dashMove 4s linear infinite' }}
+            />
+          </svg>
 
-          <rect
-            x="8"
-            y="8"
-            width="264"
-            height="614"
-            rx="12"
-            fill="none"
-            stroke="rgba(0,212,122,0.25)"
-            strokeWidth="1"
-            strokeDasharray="8 6"
-            style={{ animation: 'dashMove 4s linear infinite' }}
-          />
-        </svg>
-
-        <div style={{
-          position: 'absolute', top: -32, left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)',
-          padding: '4px 12px',
-          borderRadius: 20,
-          border: '1px solid rgba(0,212,122,0.3)',
-        }}>
           <div style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: isRecording ? '#ef4444' : '#00d47a',
-            boxShadow: `0 0 6px ${isRecording ? '#ef4444' : '#00d47a'}`,
-            animation: 'blink 1s ease-in-out infinite',
-          }} />
-          <span style={{
-            color: '#00d47a', fontSize: 10, fontWeight: 600,
-            letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace',
+            position: 'absolute', top: -32, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(4px)',
+            padding: '4px 12px',
+            borderRadius: 20,
+            border: '1px solid rgba(0,212,122,0.3)',
           }}>
-            {isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'}
-          </span>
+            <div style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: isRecording ? '#ef4444' : '#00d47a',
+              boxShadow: `0 0 6px ${isRecording ? '#ef4444' : '#00d47a'}`,
+              animation: 'blink 1s ease-in-out infinite',
+            }} />
+            <span style={{
+              color: '#00d47a', fontSize: 10, fontWeight: 600,
+              letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace',
+            }}>
+              {isRecording ? 'RECORDING' : 'ALIGN TYRE TREAD'}
+            </span>
+          </div>
         </div>
-      </div>
       ) : (
         /* Photo Frames */
         <div style={{
@@ -685,25 +685,25 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
             }}>
               <svg viewBox="0 0 100 150" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
                 {/* Tyre Profile Outline */}
-                <path 
-                  d="M 20 2 Q 5 75 20 148 L 80 148 Q 95 75 80 2 Z" 
-                  fill="none" 
-                  stroke="#00d47a" 
-                  strokeWidth="2.5" 
+                <path
+                  d="M 5 2 Q -2 75 5 148 L 95 148 Q 102 75 95 2 Z"
+                  fill="none"
+                  stroke="#00d47a"
+                  strokeWidth="2.5"
                   strokeDasharray="6 3"
                   filter="drop-shadow(0 0 8px rgba(0,212,122,0.4))"
                 />
-                
+
                 {/* Internal Tread Pattern Lines (As seen in Reference Image 1) */}
                 <line x1="32" y1="8" x2="32" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
                 <line x1="44" y1="8" x2="44" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
                 <line x1="56" y1="8" x2="56" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
                 <line x1="68" y1="8" x2="68" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
-                
+
                 {/* Horizontal Level Guides */}
-                <line x1="15" y1="30" x2="85" y2="30" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
-                <line x1="15" y1="75" x2="85" y2="75" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
-                <line x1="15" y1="120" x2="85" y2="120" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
+                <line x1="2" y1="30" x2="98" y2="30" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
+                <line x1="2" y1="75" x2="98" y2="75" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
+                <line x1="2" y1="120" x2="98" y2="120" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
 
                 {/* Center Crosshair */}
                 <circle cx="50" cy="75" r="4" stroke="#00d47a" strokeWidth="1" fill="none" />
@@ -713,8 +713,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
 
               <div style={{
                 position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(0,212,122,0.95)', padding: '6px 16px', borderRadius: 8,
-                color: '#001a0d', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                background: 'rgba(0,212,122,0.95)', padding: '6px 14px', borderRadius: 8,
+                color: '#001a0d', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 20
               }}>
                 ALIGN TREAD IN PROFILE
@@ -733,58 +733,66 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               <svg viewBox="0 0 200 160" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
                 <defs>
                   <filter id="glowBlue">
-                    <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                    <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
                     <feMerge>
-                      <feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/>
+                      <feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" />
                     </feMerge>
                   </filter>
                 </defs>
 
-                {/* Focused scanning target area (Curved Box) - 50% width version */}
-                <path 
-                  d="M 50 100 A 150 70 0 0 1 150 100 L 145 85 A 150 70 0 0 0 55 85 Z" 
-                  fill="rgba(59, 130, 246, 0.2)"
+                {/* Professional Focal Zone Highlight (Curved Box) */}
+                <path
+                  d="M 5 110 A 300 150 0 0 1 195 110 L 192 95 A 300 150 0 0 0 8 95 Z"
+                  fill="rgba(59, 130, 246, 0.15)"
                   stroke="#3b82f6"
-                  strokeWidth="2"
-                  opacity="0.9"
+                  strokeWidth="1.5"
+                  opacity="0.8"
                 />
 
-                {/* Precision Alignment Markers */}
-                <path d="M 45 80 L 50 80 L 50 85" fill="none" stroke="#3b82f6" strokeWidth="2" />
-                <path d="M 155 80 L 150 80 L 150 85" fill="none" stroke="#3b82f6" strokeWidth="2" />
-                <path d="M 45 105 L 50 105 L 50 100" fill="none" stroke="#3b82f6" strokeWidth="2" />
-                <path d="M 155 105 L 150 105 L 150 100" fill="none" stroke="#3b82f6" strokeWidth="2" />
-
-                {/* Main Scanning Arch (Centered & Focused) */}
-                <path 
-                  d="M 40 92 A 180 80 0 0 1 160 92" 
-                  fill="none" 
-                  stroke="#3b82f6" 
-                  strokeWidth="4" 
-                  strokeDasharray="15 5" 
+                {/* Main Wide Professional Arc */}
+                <path
+                  d="M 4 100 A 300 120 0 0 1 196 100"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="3.5"
+                  strokeDasharray="20 5"
                   filter="url(#glowBlue)"
                 />
 
-                {/* Center Focal Target */}
-                <circle cx="100" cy="92.5" r="8" stroke="#3b82f6" strokeWidth="2" fill="rgba(59,130,246,0.1)" />
-                <line x1="90" y1="92.5" x2="110" y2="92.5" stroke="#3b82f6" strokeWidth="1.5" />
-                <line x1="100" y1="82.5" x2="100" y2="102.5" stroke="#3b82f6" strokeWidth="1.5" />
+                {/* Secondary Bottom Guide Arc */}
+                <path
+                  d="M 8 120 A 300 140 0 0 1 192 120"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="1"
+                  opacity="0.4"
+                />
+
+                {/* Alignment Crosshair Extensions */}
+                <path d="M 4 100 L 0 100 M 196 100 L 200 100" stroke="#3b82f6" strokeWidth="2" opacity="0.6" />
+
 
                 {/* Orientation & Focal Label */}
-                <text x="100" y="30" fill="#3b82f6" fontSize="12" fontWeight="900" textAnchor="middle" style={{ letterSpacing: '3px' }}>FOCUSED SCANNING AREA</text>
+                <text x="100" y="25" fill="#3b82f6" fontSize="7.5" fontWeight="700" textAnchor="middle" style={{ opacity: 0.8, letterSpacing: '2px' }}>SIDEWALL SCANNING AREA</text>
+
+                {/* Precision Alignment Brackets (Full Width) */}
+                <path d="M 4 90 L 4 100 L 19 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
+                <path d="M 196 90 L 196 100 L 181 100" fill="none" stroke="#3b82f6" strokeWidth="2.5" />
+
+                {/* Center Focal Target */}
+                <circle cx="100" cy="45" r="6" stroke="#3b82f6" strokeWidth="1.5" fill="none" opacity="0.7" />
                 <line x1="90" y1="45" x2="110" y2="45" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
                 <line x1="100" y1="35" x2="100" y2="55" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
               </svg>
 
               <div style={{
                 position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(59, 130, 246, 0.95)', padding: '12px 32px', borderRadius: 16,
-                color: 'white', fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap',
-                boxShadow: '0 12px 32px rgba(59, 130, 246, 0.5)', zIndex: 20,
-                border: '2px solid rgba(255,255,255,0.4)',
-                textTransform: 'uppercase', letterSpacing: '1px'
+                background: 'rgba(59, 130, 246, 0.95)', padding: '8px 20px', borderRadius: 12,
+                color: 'white', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)', zIndex: 20,
+                border: '1px solid rgba(255,255,255,0.2)'
               }}>
-                Target Defect / Specs
+                ALIGN SPECIFICATIONS IN ARC
               </div>
             </div>
           )}
@@ -1414,11 +1422,11 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ mode, onContinu
           {mode === 'video' ? 'Selective Tread Recording' : mode === 'photo_tread' ? 'Tread Profile Capture' : 'Sidewall Arc Capture'}
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          {mode === 'video' 
+          {mode === 'video'
             ? 'Only the tread inside the green frame will be captured — perfect, cropped output'
             : mode === 'photo_tread'
-            ? 'Capture high-resolution tread profile with professional arched guides'
-            : 'Capture clear sidewall details using the calibrated tyre arc guide'}
+              ? 'Capture high-resolution tread profile with professional arched guides'
+              : 'Capture clear sidewall details using the calibrated tyre arc guide'}
         </p>
       </div>
 
@@ -1539,11 +1547,11 @@ const Home: React.FC = () => {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
           {/* 1. VIDEO SECTION */}
-          <button 
+          <button
             onClick={() => {
               setCaptureMode('video');
               setStage('prompt');
-            }} 
+            }}
             style={{
               width: '100%', background: 'none',
               border: '1px solid rgba(0,212,122,0.2)', borderRadius: 20,
@@ -1569,11 +1577,11 @@ const Home: React.FC = () => {
           </button>
 
           {/* 2. TREAD PHOTO SECTION */}
-          <button 
+          <button
             onClick={() => {
               setCaptureMode('photo_tread');
               setStage('prompt');
-            }} 
+            }}
             style={{
               width: '100%', background: 'none',
               border: '1px solid rgba(0,212,122,0.2)', borderRadius: 20,
@@ -1601,11 +1609,11 @@ const Home: React.FC = () => {
           </button>
 
           {/* 3. SIDEWALL PHOTO SECTION */}
-          <button 
+          <button
             onClick={() => {
               setCaptureMode('photo_sidewall');
               setStage('prompt');
-            }} 
+            }}
             style={{
               width: '100%', background: 'none',
               border: '1px solid rgba(59,130,246,0.2)', borderRadius: 20,
