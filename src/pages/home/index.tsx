@@ -744,7 +744,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   position: "absolute",
                   top: 0,
                   left: 0,
-                  // transform: 'rotate(90deg)',
+                  transform: 'rotate(90deg)',
                   transformOrigin: 'center center'
                 }}
               >
