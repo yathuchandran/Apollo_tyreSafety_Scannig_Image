@@ -680,45 +680,48 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           justifyContent: 'center',
         }}>
           {photoSubMode === 'tread' ? (
-            /* Refined Tread PHOTO Frame: Arched Profile with Lines */
+            /* Original Tread PHOTO Frame: Arched Profile (Increased Size) */
             <div style={{
               width: '100%',
               height: '100%',
               position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <svg viewBox="0 0 100 150" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                {/* Tyre Profile Outline */}
+              <svg viewBox="0 0 110 170" style={{ width: '92%', height: '92%', overflow: 'visible' }}>
+                {/* Tyre Profile Outline (Scaled Up) */}
                 <path
-                  d="M 5 2 Q -2 75 5 148 L 95 148 Q 102 75 95 2 Z"
+                  d="M 5 2 Q -5 85 5 168 L 105 168 Q 115 85 105 2 Z"
                   fill="none"
                   stroke="#00d47a"
-                  strokeWidth="2.5"
-                  strokeDasharray="6 3"
-                  filter="drop-shadow(0 0 8px rgba(0,212,122,0.4))"
+                  strokeWidth="2.8"
+                  strokeDasharray="7 4"
+                  filter="drop-shadow(0 0 10px rgba(0,212,122,0.45))"
                 />
 
-                {/* Internal Tread Pattern Lines (As seen in Reference Image 1) */}
-                <line x1="32" y1="8" x2="32" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
-                <line x1="44" y1="8" x2="44" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
-                <line x1="56" y1="8" x2="56" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
-                <line x1="68" y1="8" x2="68" y2="142" stroke="#00d47a" strokeWidth="1" opacity="0.4" />
+                {/* Internal Tread Pattern Lines (Scaled Up) */}
+                <line x1="35" y1="10" x2="35" y2="160" stroke="#00d47a" strokeWidth="1.2" opacity="0.4" />
+                <line x1="50" y1="10" x2="50" y2="160" stroke="#00d47a" strokeWidth="1.2" opacity="0.4" />
+                <line x1="65" y1="10" x2="65" y2="160" stroke="#00d47a" strokeWidth="1.2" opacity="0.4" />
+                <line x1="80" y1="10" x2="80" y2="160" stroke="#00d47a" strokeWidth="1.2" opacity="0.4" />
 
                 {/* Horizontal Level Guides */}
-                <line x1="2" y1="30" x2="98" y2="30" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
-                <line x1="2" y1="75" x2="98" y2="75" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
-                <line x1="2" y1="120" x2="98" y2="120" stroke="#00d47a" strokeWidth="0.5" opacity="0.2" />
+                <line x1="2" y1="40" x2="108" y2="40" stroke="#00d47a" strokeWidth="0.6" opacity="0.25" />
+                <line x1="2" y1="85" x2="108" y2="85" stroke="#00d47a" strokeWidth="0.6" opacity="0.25" />
+                <line x1="2" y1="130" x2="108" y2="130" stroke="#00d47a" strokeWidth="0.6" opacity="0.25" />
 
                 {/* Center Crosshair */}
-                <circle cx="50" cy="75" r="4" stroke="#00d47a" strokeWidth="1" fill="none" />
-                <line x1="45" y1="75" x2="55" y2="75" stroke="#00d47a" strokeWidth="1" />
-                <line x1="50" y1="70" x2="50" y2="80" stroke="#00d47a" strokeWidth="1" />
+                <circle cx="55" cy="85" r="5" stroke="#00d47a" strokeWidth="1.2" fill="none" />
+                <line x1="48" y1="85" x2="62" y2="85" stroke="#00d47a" strokeWidth="1.2" />
+                <line x1="55" y1="78" x2="55" y2="92" stroke="#00d47a" strokeWidth="1.2" />
               </svg>
 
               <div style={{
-                position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(0,212,122,0.95)', padding: '6px 14px', borderRadius: 8,
-                color: '#001a0d', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 20
+                position: 'absolute', bottom: '15%', left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(0,212,122,0.95)', padding: '8px 18px', borderRadius: 8,
+                color: '#001a0d', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.35)', zIndex: 20
               }}>
                 ALIGN TREAD IN PROFILE
               </div>
@@ -734,7 +737,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               justifyContent: 'center'
             }}>
               <svg
-                viewBox="0 0 200 200"
+                viewBox="0 0 400 300"
                 style={{
                   width: "100%",
                   height: "100%",
@@ -747,16 +750,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               >
                 <defs>
                   {/* Glow Effects */}
-                  <filter id="glowBlue">
-                    <feGaussianBlur stdDeviation="2" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-
                   <filter id="glowGreen">
-                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feGaussianBlur stdDeviation="3.5" result="blur" />
                     <feMerge>
                       <feMergeNode in="blur" />
                       <feMergeNode in="SourceGraphic" />
@@ -764,60 +759,52 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   </filter>
                 </defs>
 
-                {/* 🔵 Instruction Text - Rotated to be vertical on screen (horizontal in hand) */}
+                {/* 🔵 Instruction Text - Centered vertically in the 300-unit space */}
                 <text
-                  x="100"
-                  y="20"
+                  x="200"
+                  y="45"
                   textAnchor="middle"
-                  fontSize="8"
+                  fontSize="8.5"
                   fill="#f63b3b"
-                  fontWeight="600"
-                  letterSpacing="1.5"
+                  fontWeight="700"
+                  letterSpacing="1.8"
                 >
                   ALIGN TYRE TEXT INSIDE FRAME
                 </text>
 
-                {/* 🟢 Curved Capture Zone (Landscape Orientation) */}
+                {/* 🟢 Curved Capture Zone (Extra Large - Thick & Deep) */}
                 <path
-                  d="M 5 150 A 200 160 0 0 1 195 150 L 190 80 A 200 160 0 0 0 10 80 Z"
-                  fill="rgba(34,197,94,0.12)"
+                  d="M 2 285 A 400 350 0 0 1 398 285 L 390 15 A 400 350 0 0 0 10 15 Z"
+                  fill="rgba(34,197,94,0.18)"
                   stroke="#22c55e"
-                  strokeWidth="2.5"
+                  strokeWidth="3.8"
                   filter="url(#glowGreen)"
                 />
 
-                {/* 🔴 Main Alignment Arc */}
+                {/* 🔴 Main Alignment Arc (Full Width Span) */}
                 <path
-                  d="M 5 115 A 215 115 0 0 1 195 115"
+                  d="M 5 165 A 410 240 0 0 1 395 165"
                   fill="none"
                   stroke="#ef4444"
-                  strokeWidth="1.2"
-                  strokeDasharray="8 6"
+                  strokeWidth="1.8"
+                  strokeDasharray="12 10"
                 />
 
-                {/* 🔵 Secondary Guide Arc */}
-                <path
-                  d="M 10 130 A 265 155 0 0 1 190 130"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="1.2"
-                  opacity="0.35"
-                />
-
-                {/* 🎯 Center Crosshair */}
-                <circle cx="100" cy="70" r="6" stroke="#3b82f6" fill="none" />
-                <line x1="90" y1="70" x2="110" y2="70" stroke="#3b82f6" />
-                <line x1="100" y1="60" x2="100" y2="80" stroke="#3b82f6" />
+                {/* 🎯 Center Crosshair (Centered at y=150) */}
+                <circle cx="200" cy="150" r="14" stroke="#3b82f6" fill="none" strokeWidth="2.2" />
+                <line x1="178" y1="150" x2="222" y2="150" stroke="#3b82f6" strokeWidth="2.2" />
+                <line x1="200" y1="128" x2="200" y2="172" stroke="#3b82f6" strokeWidth="2.2" />
 
                 {/* 🔽 Bottom Hint */}
                 <text
-                  x="100"
-                  y="180"
+                  x="200"
+                  y="280"
                   textAnchor="middle"
-                  fontSize="7"
+                  fontSize="8"
                   fill="#9ca3af"
+                  fontWeight="500"
                 >
-                  Keep tyre straight • Avoid tilt • Good lighting
+                  Keep tyre straight • Good lighting
                 </text>
               </svg>
             </div>
