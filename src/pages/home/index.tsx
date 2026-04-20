@@ -10,7 +10,7 @@ interface CameraCaptureProps {
 // Extended types for torch support
 interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
-  zoom?: any;
+  // zoom?: any;
 }
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, onPhotoCapture, onClose }) => {
@@ -87,7 +87,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
     }
   };
 
-  /*
   const applyZoom = async (stream: MediaStream, zoomLevel: number) => {
     try {
       const videoTrack = stream.getVideoTracks()[0];
@@ -103,7 +102,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
       console.error('Failed to apply zoom:', error);
     }
   };
-  */
 
   // Animate vertical scan line
   useEffect(() => {
@@ -196,9 +194,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           videoRef.current.onloadedmetadata = () => {
             setIsCameraReady(true);
             turnOnFlash(stream);
-            if (initialMode === 'photo_sidewall') {
-              // Automatic zoom removed as per user request for 10cm capture distance.
-              // applyZoom(stream, 2.5);
+            if (initialMode === 'photo_sidewall' || initialMode === 'photo_tread') {
+              // Explicitly reset zoom to 1.0 to remove any 'default' zooming
+              applyZoom(stream, 1.0);
             }
           };
         }
@@ -772,12 +770,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   ALIGN TYRE TEXT INSIDE FRAME
                 </text>
 
-                {/* 🟢 Curved Capture Zone (Extra Large - Thick & Deep) */}
+                {/* 🟢 Curved Capture Zone (Continuous Arched Shell - No straight cuts) */}
                 <path
-                  d="M 1 285 A 400 350 0 0 1 398 285 L 390 15 A 400 350 0 0 0 10 15 Z"
+                  d="M 5 282 A 400 350 0 0 1 395 282 Q 410 150 392 18 A 400 350 0 0 0 8 18 Q -10 150 5 282 Z"
                   fill="rgba(34,197,94,0.18)"
                   stroke="#22c55e"
-                  strokeWidth="3.8"
+                  strokeWidth="3.2"
                   filter="url(#glowGreen)"
                 />
 
