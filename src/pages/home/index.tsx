@@ -744,7 +744,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   position: "absolute",
                   top: 0,
                   left: 0,
-                  transform: 'rotate(90deg)',
+                  // transform: 'rotate(90deg)',
                   transformOrigin: 'center center'
                 }}
               >
@@ -774,7 +774,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
 
                 {/* 🟢 Curved Capture Zone (Extra Large - Thick & Deep) */}
                 <path
-                  d="M 2 285 A 400 350 0 0 1 398 285 L 390 15 A 400 350 0 0 0 10 15 Z"
+                  d="M 1 285 A 400 350 0 0 1 398 285 L 390 15 A 400 350 0 0 0 10 15 Z"
                   fill="rgba(34,197,94,0.18)"
                   stroke="#22c55e"
                   strokeWidth="3.8"
@@ -782,21 +782,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                 />
 
                 {/* 🔴 Main Alignment Arc (Full Width Span) */}
-                <path
+                {/* <path
                   d="M 5 165 A 410 240 0 0 1 395 165"
                   fill="none"
                   stroke="#ef4444"
                   strokeWidth="1.8"
                   strokeDasharray="12 10"
-                />
+                /> */}
 
                 {/* 🎯 Center Crosshair (Centered at y=150) */}
-                <circle cx="200" cy="150" r="14" stroke="#3b82f6" fill="none" strokeWidth="2.2" />
-                <line x1="178" y1="150" x2="222" y2="150" stroke="#3b82f6" strokeWidth="2.2" />
-                <line x1="200" y1="128" x2="200" y2="172" stroke="#3b82f6" strokeWidth="2.2" />
+                {/* <circle cx="200" cy="150" r="14" stroke="#3b82f6" fill="none" strokeWidth="2.2" /> */}
+                {/* <line x1="178" y1="150" x2="222" y2="150" stroke="#3b82f6" strokeWidth="2.2" /> */}
+                {/* <line x1="200" y1="128" x2="200" y2="172" stroke="#3b82f6" strokeWidth="2.2" /> */}
 
                 {/* 🔽 Bottom Hint */}
-                <text
+                {/* <text
                   x="200"
                   y="280"
                   textAnchor="middle"
@@ -805,7 +805,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   fontWeight="500"
                 >
                   Keep tyre straight • Good lighting
-                </text>
+                </text> */}
               </svg>
             </div>
           )}
