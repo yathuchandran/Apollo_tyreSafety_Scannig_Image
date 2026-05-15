@@ -770,12 +770,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   ALIGN TYRE TEXT INSIDE FRAME
                 </text>
 
-                {/* 🟢 Curved Capture Zone (Continuous Arched Shell - No straight cuts) */}
+                {/* 🟢 Left Side Arched Guide */}
                 <path
-                  d="M 5 282 A 400 350 0 0 1 395 282 Q 410 150 392 18 A 400 350 0 0 0 8 18 Q -10 150 5 282 Z"
-                  fill="rgba(34,197,94,0.18)"
+                  d="M 10 20 A 400 350 0 0 0 390 20"
+                  fill="none"
                   stroke="#22c55e"
-                  strokeWidth="3.2"
+                  strokeWidth="4.5"
+                  strokeLinecap="round"
+                  filter="url(#glowGreen)"
+                />
+
+                {/* 🟢 Right Side Arched Guide */}
+                <path
+                  d="M 10 280 A 400 350 0 0 1 390 280"
+                  fill="none"
+                  stroke="#22c55e"
+                  strokeWidth="4.5"
+                  strokeLinecap="round"
                   filter="url(#glowGreen)"
                 />
 
