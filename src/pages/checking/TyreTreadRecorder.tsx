@@ -5,7 +5,7 @@ interface TyreTreadRecorderProps {
   onRecordingComplete: (videoBlob: Blob) => void;
 }
 
-const CROP_WIDTH_PERCENT = 0.28;
+
 const START_PHASE_DURATION = 2000;
 
 const TyreTreadRecorder: React.FC<TyreTreadRecorderProps> = ({ onRecordingComplete }) => {

@@ -641,7 +641,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
             <div style={{
               background: 'rgba(0,212,122,0.9)', backdropFilter: 'blur(10px)',
               padding: '8px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.2)',
-              boxShadow: '0 8px 32px rgba(0,212,122,0.3)', animate: 'pulse 2s infinite'
+              boxShadow: '0 8px 32px rgba(0,212,122,0.3)', animation: 'pulse 2s infinite'
             }}>
               <span style={{ color: '#001a0d', fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 Maintain 10cm Distance
