@@ -141,14 +141,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
       return;
     }
 
-    // --- FIX 2: Rely on the canvas dimensions set in startRecording ---
-    const leftTrimPercent = 0.20;
-    const topStartPct = 0.20;
+    // Centered crop calculation
+    const sx = (video.videoWidth - canvas.width) / 2;
+    const sy = (video.videoHeight - canvas.height) / 2;
 
-    const sx = video.videoWidth * leftTrimPercent;
-    const sy = video.videoHeight * topStartPct;
-
-    // Draw using the pre-calculated canvas width/height
     ctx.drawImage(
       video,
       sx,
@@ -183,9 +179,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            // Removed strict aspectRatio: { exact: 4 / 3 } to allow for a native, full-height mobile view.
+            width: { ideal: 1080 },
+            height: { ideal: 1920 },
           },
         });
         if (videoRef.current) {
@@ -205,8 +200,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
+              width: { ideal: 1080 },
+              height: { ideal: 1920 },
             },
           });
           if (videoRef.current) {
@@ -247,22 +242,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    // --- CROP PARAMETERS ---
-    const leftTrimPercent = 0.20; // Start at 20%
-    const heightPct = 0.30;       // 30% tall slice
+    // --- MATCH VISUAL FRAME ASPECT RATIO (3.7 / 7) ---
+    const frameAspectRatio = 3.7 / 7;
+    
+    // The frame in the UI is 82% width
+    const targetWidth = video.videoWidth * 0.82;
+    const targetHeight = targetWidth / frameAspectRatio;
 
-    // sx is our starting point on the X axis
-    const sx = video.videoWidth * leftTrimPercent;
-
-    // Calculate width to reach the ABSOLUTE right edge (100% width)
-    // video.videoWidth - sx gives us every pixel remaining to the right
-    const sWidth = video.videoWidth - sx;
-    const sHeight = video.videoHeight * heightPct;
-
-    // VP8/WebM encoders prefer even numbers for dimensions.
-    // We set the canvas size once here and do NOT change it during the loop.
-    canvas.width = Math.floor(sWidth / 2) * 2;
-    canvas.height = Math.floor(sHeight / 2) * 2;
+    canvas.width = Math.floor(targetWidth / 2) * 2;
+    canvas.height = Math.floor(targetHeight / 2) * 2;
 
     croppedChunksRef.current = [];
     originalChunksRef.current = [];
@@ -310,6 +298,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
     }, 1000);
 
     setIsRecording(true);
+    if (navigator.vibrate) navigator.vibrate(200);
     drawToCanvas();
   };
 
@@ -643,6 +632,31 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
             />
           </svg>
 
+          {/* 📏 10cm Distance Instruction Overlay */}
+          <div style={{
+            position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+            pointerEvents: 'none', width: 'max-content'
+          }}>
+            <div style={{
+              background: 'rgba(0,212,122,0.9)', backdropFilter: 'blur(10px)',
+              padding: '8px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 8px 32px rgba(0,212,122,0.3)', animate: 'pulse 2s infinite'
+            }}>
+              <span style={{ color: '#001a0d', fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                Maintain 10cm Distance
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  width: 6, height: 6, borderRadius: '50%', background: '#00d47a',
+                  animation: `bounce 0.6s infinite ${i * 0.15}s`
+                }} />
+              ))}
+            </div>
+          </div>
+
           <div style={{
             position: 'absolute', top: -32, left: '50%', transform: 'translateX(-50%)',
             display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
@@ -725,7 +739,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               </div>
             </div>
           ) : (
-            /* Refined Sidewall PHOTO Frame: Professional Wide-Arc rotated for landscape */
+            /* Refined Sidewall PHOTO Frame: Vertical Portrait Arc */
             <div style={{
               width: '100%',
               height: '100%',
@@ -735,19 +749,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               justifyContent: 'center'
             }}>
               <svg
-                viewBox="0 0 400 300"
+                viewBox="0 0 300 400"
                 style={{
                   width: "100%",
                   height: "100%",
                   position: "absolute",
                   top: 0,
                   left: 0,
-                  transform: 'rotate(90deg)',
+                  transform: 'none',
                   transformOrigin: 'center center'
                 }}
               >
                 <defs>
-                  {/* Glow Effects */}
                   <filter id="glowGreen">
                     <feGaussianBlur stdDeviation="3.5" result="blur" />
                     <feMerge>
@@ -757,70 +770,42 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
                   </filter>
                 </defs>
 
-                {/* 🔵 Instruction Text - Centered vertically in the 300-unit space */}
                 <text
-                  x="200"
+                  x="150"
                   y="45"
                   textAnchor="middle"
                   fontSize="8.5"
-                  fill="#f63b3b"
+                  fill="#00d47a"
                   fontWeight="700"
                   letterSpacing="1.8"
                 >
-                  ALIGN TYRE TEXT INSIDE FRAME
+                  ALIGN TYRE SIDEWALL
                 </text>
 
-                {/* 🟢 Left Side Arched Guide */}
+                {/* 🟢 Vertical Capture Zone (Portrait Arched Shell) */}
                 <path
-                  d="M 10 20 A 400 350 0 0 0 390 20"
-                  fill="none"
+                  d="M 50 20 Q 10 200 50 380 L 250 380 Q 290 200 250 20 Z"
+                  fill="rgba(34,197,94,0.18)"
                   stroke="#22c55e"
-                  strokeWidth="4.5"
-                  strokeLinecap="round"
+                  strokeWidth="3.2"
                   filter="url(#glowGreen)"
                 />
 
-                {/* 🟢 Right Side Arched Guide */}
-                <path
-                  d="M 10 280 A 400 350 0 0 1 390 280"
-                  fill="none"
-                  stroke="#22c55e"
-                  strokeWidth="4.5"
-                  strokeLinecap="round"
-                  filter="url(#glowGreen)"
-                />
-
-                {/* 🔴 Main Alignment Arc (Full Width Span) */}
-                {/* <path
-                  d="M 5 165 A 410 240 0 0 1 395 165"
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth="1.8"
-                  strokeDasharray="12 10"
-                /> */}
-
-                {/* 🎯 Center Crosshair (Centered at y=150) */}
-                {/* <circle cx="200" cy="150" r="14" stroke="#3b82f6" fill="none" strokeWidth="2.2" /> */}
-                {/* <line x1="178" y1="150" x2="222" y2="150" stroke="#3b82f6" strokeWidth="2.2" /> */}
-                {/* <line x1="200" y1="128" x2="200" y2="172" stroke="#3b82f6" strokeWidth="2.2" /> */}
-
-                {/* 🔽 Bottom Hint */}
-                {/* <text
-                  x="200"
-                  y="280"
-                  textAnchor="middle"
-                  fontSize="8"
-                  fill="#9ca3af"
-                  fontWeight="500"
-                >
-                  Keep tyre straight • Good lighting
-                </text> */}
+                <circle cx="150" cy="200" r="10" stroke="#00d47a" fill="none" strokeWidth="1.5" opacity="0.6" />
               </svg>
+
+              <div style={{
+                position: 'absolute', bottom: '15%', left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(59,130,246,0.95)', padding: '8px 18px', borderRadius: 8,
+                color: '#fff', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.35)', zIndex: 20
+              }}>
+                ALIGN SIDEWALL ARC
+              </div>
             </div>
           )}
         </div>
       )}
-
       {/* ══ LEFT SIDE TYRE CURVED EDGE (START FRAME) ══ */}
       {captureType === 'video' && (!isRecording || (isRecording && !showEndFrame)) && (
         <div style={{
@@ -841,7 +826,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
               top: 0,
               height: '100%',
               width: '100%',
-              rotate: '90deg',
+              rotate: '0deg',
             }}
           >
             <defs>
@@ -997,7 +982,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           position: 'absolute',
           right: 0,
           top: '50%',
-          transform: 'translateY(0%)',
+          transform: 'translateY(-50%)',
           width: '100%',
           height: '60%',
           pointerEvents: 'none',
@@ -1008,10 +993,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
             style={{
               position: 'absolute',
               right: 0,
-              bottom: '50%',
+              top: 0,
               height: '100%',
               width: '100%',
-              rotate: '-90deg',
+              rotate: '0deg',
             }}
           >
             <defs>
@@ -1348,6 +1333,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ initialMode, onCapture, o
           0%, 100% { opacity: 0.4; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.2); }
         }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
         @keyframes shutter {
           0% { opacity: 0; }
           20% { opacity: 1; }
@@ -1454,10 +1443,11 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ mode, onContinu
 
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
+          { icon: '📱', label: 'Hold phone in Portrait Mode ONLY' },
+          { icon: '📏', label: 'Maintain 10cm (4") distance from tyre' },
           { icon: mode === 'video' ? '◎' : '📷', label: mode === 'video' ? 'Point rear camera at the tread' : 'Choose Tread or Sidewall mode' },
           { icon: '▭', label: mode === 'video' ? 'Align tread inside the green frame' : 'Align tyre within professional guides' },
           { icon: mode === 'video' ? '✂' : '✨', label: mode === 'video' ? 'Only the framed area is recorded' : 'High-resolution still capture' },
-          { icon: '●', label: mode === 'video' ? 'Tap scan to start, tap stop when finished' : 'Tap shutter button to capture photo' },
         ].map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -1500,9 +1490,8 @@ const InstructionsPrompt: React.FC<InstructionsPromptProps> = ({ mode, onContinu
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
       @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
       @keyframes phoneRotate {
-        0%,25%  { transform: rotate(0deg); }
-        55%,85% { transform: rotate(-90deg); }
-        100%    { transform: rotate(0deg); }
+        0%, 100% { transform: rotate(0deg) translateY(0); }
+        50% { transform: rotate(0deg) translateY(-10px); }
       }
       @keyframes dashMove2 { to { stroke-dashoffset: -24; } }
     `}</style>
@@ -1850,8 +1839,8 @@ const Home: React.FC = () => {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20 }}>
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', margin: '0 0 16px' }}>How it works</p>
           {([
-            ['Tap "Start Tyre Scan"', 'Launches the guided camera scanner'],
-            ['Hold phone in portrait mode', 'Point rear camera at the tyre tread'],
+            ['Portrait Mode Only', 'Always hold your device in vertical portrait mode'],
+            ['Maintain 10cm Distance', 'Keep device 10cm (4") from the tyre tread'],
             ['Align tread in green frame', 'Only the framed area will be recorded'],
             ['Tap scan to start, stop when done', 'Perfectly cropped output video'],
           ] as [string, string][]).map(([title, desc], i) => (
